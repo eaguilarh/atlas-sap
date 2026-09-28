@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+
+# Environment files - NEVER COMMIT
+.env
+.env.*
+!.env.example
+!.env.ai.example
+
+# Local development
+*.local
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Secrets (Docker secrets, etc.)
+secrets/
+
+# Backup files
+backups/
+*.bak
+*.backup
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Local tooling
+tqs-db.sh
+graphify-out/
+
+# Scratch/development files (clean up before commit)
+scratch_*.py
+scratch_*.js
+scratch_*.md
+scratch_*.txt
+
+# Database
+*.sqlite
+*.db

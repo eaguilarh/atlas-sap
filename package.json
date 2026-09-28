@@ -1,0 +1,28 @@
+{
+  "name": "atlas-backend",
+  "version": "1.0.0",
+  "description": "Backend API for ATLAS v3.0 mapping PostgREST and Auth calls to PostgreSQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests/security.test.js",
+    "db:init": "node scripts/db-init.js",
+    "db:seed": "node scripts/db-seed.js",
+    "db:migrate": "node scripts/db-migrate.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "pino": "^9.0.0",
+    "pino-pretty": "^11.0.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
+  }
+}
