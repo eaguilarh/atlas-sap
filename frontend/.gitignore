@@ -1,0 +1,21 @@
+# Dependencias y artefactos locales
+node_modules/
+.npm/
+
+# Logs del sistema
+*.log
+npm-debug.log*
+
+# Archivos de entorno y credenciales
+.env
+.env.*
+*.pem
+*.key
+
+# Archivos de SO y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+

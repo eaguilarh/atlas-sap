@@ -1,0 +1,22 @@
+<mxfile host="app.diagrams.net" agent="ATLAS-architecture-doc" version="24.0.0">
+  <diagram name="Flujo de datos ATLAS" id="Flujo_de_datos_ATLAS">
+    <mxGraphModel dx="900" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="720" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n3" value="&lt;b&gt;Usuario abre ATLAS&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#555;&#x27;&gt;SPA servida por GitHub Pages&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fontSize=13;spacing=6;fillColor=#F5F5F5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="180" y="40" width="240" height="60" as="geometry" /></mxCell>
+        <mxCell id="n4" value="&lt;b&gt;Usuario realiza acción&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#555;&#x27;&gt;Login, crear RFC, filtrar, exportar&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fontSize=13;spacing=6;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1A3B66;" vertex="1" parent="1"><mxGeometry x="180" y="140" width="240" height="60" as="geometry" /></mxCell>
+        <mxCell id="n5" value="&lt;b&gt;SPA hace fetch&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#555;&#x27;&gt;Hacia la API REST de Supabase (PostgREST)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fontSize=13;spacing=6;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontColor=#1A3B66;" vertex="1" parent="1"><mxGeometry x="180" y="240" width="240" height="60" as="geometry" /></mxCell>
+        <mxCell id="n6" value="&lt;b&gt;Supabase procesa&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#555;&#x27;&gt;Auth + Row Level Security + validación&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fontSize=13;spacing=6;fillColor=#D5E8D4;strokeColor=#82B366;fontColor=#274E13;" vertex="1" parent="1"><mxGeometry x="180" y="340" width="240" height="60" as="geometry" /></mxCell>
+        <mxCell id="n7" value="&lt;b&gt;Lee o escribe PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#555;&#x27;&gt;Tablas relacionales: rfcs, solicitudes, usuarios...&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fontSize=13;spacing=6;fillColor=#D5E8D4;strokeColor=#82B366;fontColor=#274E13;" vertex="1" parent="1"><mxGeometry x="180" y="440" width="240" height="60" as="geometry" /></mxCell>
+        <mxCell id="n8" value="&lt;b&gt;Respuesta JSON&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#555;&#x27;&gt;La UI se actualiza con el resultado&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;fontSize=13;spacing=6;fillColor=#F5F5F5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="180" y="540" width="240" height="60" as="geometry" /></mxCell>
+        <mxCell id="n9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="n3" target="n4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="n10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="n4" target="n5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="n11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="n5" target="n6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="n12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="n6" target="n7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="n13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#666666;fontSize=11;" edge="1" parent="1" source="n7" target="n8"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="n14" value="↻ Cada acción del usuario repite este ciclo" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#333333;" vertex="1" parent="1"><mxGeometry x="180" y="650" width="240" height="24" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

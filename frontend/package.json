@@ -1,0 +1,25 @@
+{
+  "name": "atlas-frontend",
+  "version": "2.5.5",
+  "description": "ATLAS · SAP Operations & Management Suite — Frontend SPA",
+  "main": "index.html",
+  "scripts": {
+    "test": "node --test tests/frontend-lint.test.js",
+    "lint": "node --test tests/frontend-lint.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eaguilarh01/atlas-frontend.git"
+  },
+  "keywords": [
+    "atlas",
+    "sap",
+    "operations",
+    "frontend",
+    "spa"
+  ],
+  "author": "EAS Consulting Group",
+  "license": "UNLICENSED",
+  "private": true
+}
+

@@ -1,0 +1,138 @@
+<mxfile host="app.diagrams.net" agent="ATLAS-architecture-v3" version="24.0.0">
+  <diagram name="Arquitectura ATLAS v3 Monorepo Modular" id="ATLAS_v3_Architecture">
+    <mxGraphModel dx="1200" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- BOUNDARY: CLIENT LAYER -->
+        <mxCell id="zone_clients" value="CAPA DE CLIENTE (NAVEGADORES Y USUARIOS)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontStyle=1;fontSize=12;fontColor=#0F2B5C;startSize=25;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="300" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="c_tqs" value="&lt;b&gt;TQS Leader / Operador&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#64748B;&#x27;&gt;Registro de RFCs, Solicitudes, Bitácora&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontColor=#0F172A;fontSize=12;" vertex="1" parent="zone_clients">
+          <mxGeometry x="20" y="40" width="260" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c_coord" value="&lt;b&gt;Coordinador KOF / Promotor&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#64748B;&#x27;&gt;Aprobación VOBO, Validación de Ventanas&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontColor=#0F172A;fontSize=12;" vertex="1" parent="zone_clients">
+          <mxGeometry x="20" y="100" width="260" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="c_dir" value="&lt;b&gt;Dirección / Guardia ME&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#64748B;&#x27;&gt;Dashboard Ejecutivo, Alertas, Reportes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#94A3B8;fontColor=#0F172A;fontSize=12;" vertex="1" parent="zone_clients">
+          <mxGeometry x="20" y="160" width="260" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- BOUNDARY: EDGE & REVERSE PROXY -->
+        <mxCell id="zone_proxy" value="CAPA DE ACCESO Y SEGURIDAD (PERÍMETRO)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;fontStyle=1;fontSize=12;fontColor=#0F2B5C;startSize=25;" vertex="1" parent="1">
+          <mxGeometry x="400" y="40" width="310" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="fw_forti" value="&lt;b&gt;FortiGate / DDNS&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#64748B;&#x27;&gt;easconsulting.fortiddns.com&lt;br&gt;Mapeo WAN:8443 / WAN:54321&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF2F2;strokeColor=#EF4444;fontColor=#991B1B;fontSize=12;" vertex="1" parent="zone_proxy">
+          <mxGeometry x="25" y="40" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="srv_nginx" value="&lt;b&gt;Nginx SSL Proxy (atlas_nginx)&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#64748B;&#x27;&gt;Puerto 8443 HTTPS (TLS 1.2/1.3)&lt;br&gt;Certificados SSL Wildcard EAS CA&lt;br&gt;Gzip + Proxy Pass a Express&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#3B82F6;fontColor=#1E3A8A;fontSize=12;" vertex="1" parent="zone_proxy">
+          <mxGeometry x="25" y="120" width="260" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- BOUNDARY: PROXMOX HYPERVISOR VM -->
+        <mxCell id="zone_proxmox" value="HYPERVISOR PROXMOX (VM 10.10.10.102) — DOCKER COMPOSE RUNTIME" style="swimlane;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#64748B;fontStyle=1;fontSize=13;fontColor=#0F172A;startSize=28;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="1020" height="490" as="geometry" />
+        </mxCell>
+
+        <!-- SUB-ZONE: FRONTEND MODULE -->
+        <mxCell id="mod_frontend" value="MÓDULO FRONTEND (frontend/)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0284C7;fontStyle=1;fontSize=12;fontColor=#0369A1;startSize=24;" vertex="1" parent="zone_proxmox">
+          <mxGeometry x="30" y="50" width="300" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="fe_spa" value="&lt;b&gt;Single Page Application (SPA)&lt;/b&gt;&lt;br&gt;index.html (Vanilla ES6+ Optimizado)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F9FF;strokeColor=#0EA5E9;fontColor=#0369A1;fontSize=11;" vertex="1" parent="mod_frontend">
+          <mxGeometry x="15" y="35" width="270" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="fe_views" value="&lt;b&gt;Vistas Modulares del Negocio&lt;/b&gt;&lt;br&gt;Dashboard, RFCs, Solicitudes, Calendario,&lt;br&gt;Matriz Sistemas, Onboarding, Usuarios" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F9FF;strokeColor=#0EA5E9;fontColor=#0369A1;fontSize=11;" vertex="1" parent="mod_frontend">
+          <mxGeometry x="15" y="90" width="270" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="fe_assets" value="&lt;b&gt;Estilos y Recursos Estáticos&lt;/b&gt;&lt;br&gt;styles.css (Design System KOF/EAS),&lt;br&gt;favicon.png, Plantillas Excel de Carga" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F9FF;strokeColor=#0EA5E9;fontColor=#0369A1;fontSize=11;" vertex="1" parent="mod_frontend">
+          <mxGeometry x="15" y="160" width="270" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- SUB-ZONE: BACKEND MODULE -->
+        <mxCell id="mod_backend" value="MÓDULO BACKEND API (backend/ — atlas_backend)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#16A34A;fontStyle=1;fontSize=12;fontColor=#15803D;startSize=24;" vertex="1" parent="zone_proxmox">
+          <mxGeometry x="360" y="50" width="330" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="be_express" value="&lt;b&gt;Servidor Express (server.js)&lt;/b&gt;&lt;br&gt;Puerto 54321 / Node.js v20 Runtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;fontColor=#15803D;fontSize=11;" vertex="1" parent="mod_backend">
+          <mxGeometry x="15" y="35" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="be_security" value="&lt;b&gt;Seguridad y Control de Acceso&lt;/b&gt;&lt;br&gt;Helmet, CORS Estricto, RateLimit (IP/DDNS),&lt;br&gt;JWT Verification &amp;amp; RBAC (Admin/Director/TQS/Guardia)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;fontColor=#15803D;fontSize=11;" vertex="1" parent="mod_backend">
+          <mxGeometry x="15" y="85" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="be_routes" value="&lt;b&gt;Adaptador PostgREST Compatible&lt;/b&gt;&lt;br&gt;/rest/v1/:table (Filtros eq, in, order, limit)&lt;br&gt;/auth/v1/* (Login, Password, MFA Questions)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;fontColor=#15803D;fontSize=11;" vertex="1" parent="mod_backend">
+          <mxGeometry x="15" y="155" width="300" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="be_validations" value="&lt;b&gt;Capa de Reglas Operativas &amp;amp; Zod&lt;/b&gt;&lt;br&gt;Normalización de horas y estatus RFC/Sol,&lt;br&gt;Regla: No reprogramar en ejecución,&lt;br&gt;Esquemas estrictos Zod en POST/PATCH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;fontColor=#15803D;fontSize=11;" vertex="1" parent="mod_backend">
+          <mxGeometry x="15" y="220" width="300" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="be_cache" value="&lt;b&gt;Motor de Caché RAM y Heurísticas AI&lt;/b&gt;&lt;br&gt;In-Memory Cache (0ms) para consultas globales,&lt;br&gt;Endpoints de alertas proactivas y recomendación TQS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;fontColor=#15803D;fontSize=11;" vertex="1" parent="mod_backend">
+          <mxGeometry x="15" y="295" width="300" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="be_dbdriver" value="&lt;b&gt;Pool PostgreSQL (pg.Pool)&lt;/b&gt;&lt;br&gt;Conexión pooling persistente con reintentos" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#22C55E;fontColor=#15803D;fontSize=11;" vertex="1" parent="mod_backend">
+          <mxGeometry x="15" y="355" width="300" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- SUB-ZONE: DATABASE MODULE -->
+        <mxCell id="mod_db" value="BASE DE DATOS (atlas_postgres)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#9333EA;fontStyle=1;fontSize=12;fontColor=#7E22CE;startSize=24;" vertex="1" parent="zone_proxmox">
+          <mxGeometry x="720" y="50" width="270" height="410" as="geometry" />
+        </mxCell>
+        <mxCell id="db_pg" value="&lt;b&gt;PostgreSQL 16 Engine&lt;/b&gt;&lt;br&gt;Puerto 5432 (Internal Docker Network)&lt;br&gt;Volumen Persistente atlas_pgdata" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#A855F7;fontColor=#7E22CE;fontSize=11;" vertex="1" parent="mod_db">
+          <mxGeometry x="15" y="35" width="240" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="db_tables" value="&lt;b&gt;Modelos Relacionales Core&lt;/b&gt;&lt;br&gt;• rfcs (RFCs SAP OnPremise/Cloud)&lt;br&gt;• solicitudes (Folios, Estatus Hist)&lt;br&gt;• tqs_users (Líderes, Colaboradores)&lt;br&gt;• sistemas (Matriz, Titular, Backup)&lt;br&gt;• audit_log (Trazabilidad estricta)&lt;br&gt;• auth_users (Credenciales bcrypt)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#A855F7;fontColor=#7E22CE;fontSize=11;" vertex="1" parent="mod_db">
+          <mxGeometry x="15" y="105" width="240" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="db_scripts" value="&lt;b&gt;DDL y Migraciones Automáticas&lt;/b&gt;&lt;br&gt;schema_onpremise.sql&lt;br&gt;Startup self-healing en server.js" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#A855F7;fontColor=#7E22CE;fontSize=11;" vertex="1" parent="mod_db">
+          <mxGeometry x="15" y="255" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- BOUNDARY: GITHUB & DEVOPS -->
+        <mxCell id="zone_github" value="GOBERNANZA Y CONTROL DE VERSIONES (GITHUB)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#0F172A;fontStyle=1;fontSize=12;fontColor=#0F172A;startSize=25;" vertex="1" parent="1">
+          <mxGeometry x="750" y="40" width="310" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="gh_repo" value="&lt;b&gt;GitHub Private Repository&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#475569;&#x27;&gt;EAS-Consulting/atlas-sap-operaciones&lt;br&gt;Estructura Monorepo Modular&lt;br&gt;Ramas: main (prod) | develop (stage)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0F172A;fontColor=#0F172A;fontSize=12;" vertex="1" parent="zone_github">
+          <mxGeometry x="25" y="40" width="260" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="gh_actions" value="&lt;b&gt;CI/CD &amp;amp; Automated Sync&lt;/b&gt;&lt;br&gt;&lt;font style=&#x27;font-size:11px;color:#475569;&#x27;&gt;GitHub Actions: Lint, TypeCheck, Tests&lt;br&gt;Webhook / SSH Deploy a Proxmox&lt;br&gt;Sin secretos en git (.gitignore estricto)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#0F172A;fontColor=#0F172A;fontSize=12;" vertex="1" parent="zone_github">
+          <mxGeometry x="25" y="125" width="260" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- CONNECTING EDGES -->
+        <mxCell id="edge1" value="HTTPS (WAN/LAN)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0284C7;strokeWidth=2;fontSize=11;fontColor=#0369A1;" edge="1" parent="1" source="zone_clients" target="fw_forti">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" value="SSL 8443 Forward" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#EF4444;strokeWidth=2;fontSize=11;fontColor=#991B1B;" edge="1" parent="1" source="fw_forti" target="srv_nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" value="Reverse Proxy (54321)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#3B82F6;strokeWidth=2;fontSize=11;fontColor=#1E3A8A;" edge="1" parent="1" source="srv_nginx" target="be_express">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="555" y="300" />
+              <mxPoint x="510" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge4" value="Serve Static Assets" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0284C7;strokeWidth=2;fontSize=11;fontColor=#0369A1;" edge="1" parent="1" source="be_express" target="fe_spa">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="450" y="390" />
+              <mxPoint x="450" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge5" value="SQL Query Pool" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2;fontSize=11;fontColor=#15803D;" edge="1" parent="1" source="be_dbdriver" target="db_pg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" value="git push / Pull Request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=2;strokeDasharray=4;fontSize=11;fontColor=#334155;" edge="1" parent="1" source="zone_proxmox" target="gh_repo">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="930" y="300" />
+              <mxPoint x="930" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

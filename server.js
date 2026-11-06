@@ -23,14 +23,14 @@ app.use((req, res, next) => {
   if (!acceptEncoding.includes('gzip')) return next();
 
   const originalSend = res.send;
-  res.send = function(body) {
+  res.send = function (body) {
     if (res.headersSent || !body) return originalSend.call(this, body);
     const contentType = String(res.getHeader('Content-Type') || '');
-    const isCompressible = !contentType || 
-      contentType.includes('text') || 
-      contentType.includes('json') || 
-      contentType.includes('javascript') || 
-      contentType.includes('css') || 
+    const isCompressible = !contentType ||
+      contentType.includes('text') ||
+      contentType.includes('json') ||
+      contentType.includes('javascript') ||
+      contentType.includes('css') ||
       contentType.includes('xml') ||
       contentType.includes('html');
 
@@ -78,7 +78,7 @@ if (!jwtSecret || jwtSecret.length < 32) {
 }
 const JWT_SECRET = jwtSecret;
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:54321,http://10.10.10.102:54321,http://10.10.10.103:54321,http://easconsulting.fortiddns.com:54321,https://easconsulting.fortiddns.com:54321,https://atlas.easconsulting.com.mx')
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:54321,http://10.10.10.102:54321,https://10.10.10.102:8443,http://10.10.10.102:8443,http://10.10.10.103:54321,http://easconsulting.fortiddns.com:54321,https://easconsulting.fortiddns.com:54321,https://atlas.easconsulting.com.mx')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
@@ -118,21 +118,59 @@ const pool = new Pool(dbConfig);
 pool.query('SELECT 1').then(async () => {
   logger.info('PostgreSQL Pool pre-warmed and connected.');
   try {
+    await pool.query("ALTER TABLE public.rfcs ADD COLUMN IF NOT EXISTS infraestructura TEXT DEFAULT 'OnPremise';");
+    await pool.query("UPDATE public.rfcs SET infraestructura = ambiente WHERE ambiente IS NOT NULL AND (infraestructura IS NULL OR infraestructura = 'OnPremise');");
+    await pool.query("ALTER TABLE public.sistemas DROP CONSTRAINT IF EXISTS sistemas_infraestructura_check;");
+    await pool.query("ALTER TABLE public.sistemas ADD CONSTRAINT sistemas_infraestructura_check CHECK (infraestructura IN ('OnPremise', 'Azure', 'Ambos'));");
     await pool.query("ALTER TABLE public.rfcs ADD COLUMN IF NOT EXISTS coordinador_kof TEXT;");
     await pool.query("ALTER TABLE public.rfcs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;");
     await pool.query("ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;");
+    await pool.query("ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS ticket TEXT;");
+    await pool.query("ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS descripcion TEXT;");
+    await pool.query("ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS ambiente TEXT;");
+    await pool.query("ALTER TABLE public.solicitudes ADD COLUMN IF NOT EXISTS estatus_historial JSONB DEFAULT '[]'::jsonb;");
     await pool.query("ALTER TABLE public.sistemas DROP CONSTRAINT IF EXISTS sistemas_nombre_owner_key;");
     await pool.query("ALTER TABLE public.sistemas DROP CONSTRAINT IF EXISTS sistemas_nombre_key;");
     await pool.query("ALTER TABLE public.sistemas ADD CONSTRAINT sistemas_nombre_key UNIQUE (nombre);");
     await pool.query("ALTER TABLE public.rfcs DROP CONSTRAINT IF EXISTS rfcs_ticket_key;");
     await pool.query("ALTER TABLE public.rfcs DROP CONSTRAINT IF EXISTS rfcs_ticket_sistema_key;");
-    await pool.query("ALTER TABLE public.rfcs ADD CONSTRAINT rfcs_ticket_sistema_key UNIQUE (ticket, sistema_name);");
+    await pool.query("ALTER TABLE public.rfcs DROP CONSTRAINT IF EXISTS rfcs_ticket_sistema_fecha_key;");
+    await pool.query("ALTER TABLE public.rfcs ADD CONSTRAINT rfcs_ticket_sistema_fecha_key UNIQUE (ticket, sistema_name, fecha);");
     await pool.query("ALTER TABLE public.rfcs DROP CONSTRAINT IF EXISTS rfcs_status_check;");
-    await pool.query("ALTER TABLE public.rfcs ADD CONSTRAINT rfcs_status_check CHECK (status IN ('En espera de VOBO', 'En Ejecución', 'Finalizado con éxito', 'Finalizado sin éxito', 'Aprobado', 'Cancelado', 'Reprogramar'));");
+    await pool.query("ALTER TABLE public.rfcs ADD CONSTRAINT rfcs_status_check CHECK (status IN ('En espera de VOBO', 'En espera', 'Pendiente', 'PENDIENTE', 'En Ejecución', 'En ejecución', 'En ejecucion', 'En Proceso', 'En proceso', 'EN_PROCESO', 'Finalizado con éxito', 'Finalizado con exito', 'Finalizado', 'Exitoso', 'Completado', 'COMPLETADO', 'Finalizado sin éxito', 'Finalizado sin exito', 'Fallido', 'Aprobado', 'APROBADO', 'Cancelado', 'CANCELADO', 'Reprogramar', 'Reprogramado', 'REPROGRAMADO', 'Borrador'));");
     await pool.query("DELETE FROM public.sistemas WHERE nombre = 'Proxmox VE Cluster (Hypervisor)';");
-    await pool.query("UPDATE public.rfcs SET sistema_name = 'SAP EP' WHERE sistema_name = 'EP';");
+    // Mutación de arranque revertida para preservar sistemas reales de tickets históricos
+    await pool.query("UPDATE public.rfcs SET status = 'Finalizado con éxito' WHERE ticket IN ('CHG1510931', 'CHG1509696', 'CHG1519836') OR (status = 'Cancelado' AND (observaciones ILIKE '%éxito%' OR observaciones ILIKE '%exito%' OR observaciones ILIKE '%concluido%' OR observaciones ILIKE '%finalizado%'));");
+    await pool.query("UPDATE public.rfcs SET promotor = coordinador_kof, coordinador_kof = 'Guadalupe Arguelles' WHERE (promotor ILIKE '%Guadalupe Arg%') AND coordinador_kof IS NOT NULL AND TRIM(coordinador_kof) != '' AND coordinador_kof NOT ILIKE '%Guadalupe%';");
+    await pool.query("UPDATE public.rfcs SET coordinador_kof = 'Guadalupe Arguelles', promotor = CASE WHEN sistema_name ILIKE '%CRM%' THEN 'Germán Bravo' WHEN sistema_name ILIKE '%PI%' THEN 'Ulises Gutierrez' WHEN sistema_name ILIKE '%Data Services%' THEN 'Daniel Ponce' WHEN sistema_name ILIKE '%ADS%' THEN 'Ulises Gutierrez' WHEN sistema_name ILIKE '%MII%' THEN 'Germán Bravo' ELSE 'Solicitante KOF' END WHERE (promotor ILIKE '%Guadalupe Arg%' OR promotor IS NULL OR TRIM(promotor) = '');");
+    await pool.query("UPDATE public.rfcs SET descripcion = observaciones WHERE (descripcion IS NULL OR TRIM(descripcion) = '' OR descripcion ILIKE '%carga inicial%') AND observaciones IS NOT NULL AND TRIM(observaciones) != '' AND observaciones NOT ILIKE 'Sin %';");
+    await pool.query("UPDATE public.rfcs SET descripcion = ticket || ' - ' || sistema_name WHERE (descripcion IS NULL OR TRIM(descripcion) = '' OR descripcion ILIKE '%carga inicial%');");
+    await pool.query("UPDATE public.sistemas SET nombre = REGEXP_REPLACE(nombre, '^SAP\\s+', '') WHERE nombre LIKE 'SAP %';");
+    await pool.query("UPDATE public.rfcs SET sistema_name = REGEXP_REPLACE(sistema_name, '^SAP\\s+', '') WHERE sistema_name LIKE 'SAP %';");
+    await pool.query("DELETE FROM public.sistemas WHERE nombre ILIKE 'BW' OR nombre ILIKE 'SAP BW';");
+    await pool.query("DELETE FROM public.rfcs WHERE sistema_name ILIKE 'BW' OR sistema_name ILIKE 'SAP BW';");
+    await pool.query("UPDATE public.auth_users SET email = 'nancy.dolores@easconsulting.com.mx' WHERE LOWER(email) LIKE '%nancy%dolores%';");
+    await pool.query("UPDATE public.tqs_users SET email = 'nancy.dolores@easconsulting.com.mx' WHERE LOWER(email) LIKE '%nancy%dolores%';");
+    await pool.query("UPDATE public.rfcs SET promotor = REGEXP_REPLACE(promotor, '^âC', '') WHERE promotor LIKE 'âC%';");
+    await pool.query("UPDATE public.rfcs SET promotor = REPLACE(promotor, 'GermÃ¡n', 'Germán') WHERE promotor LIKE '%GermÃ¡n%';");
+    await pool.query("UPDATE public.rfcs SET promotor = REPLACE(promotor, 'GutiÃ©rrez', 'Gutiérrez') WHERE promotor LIKE '%GutiÃ©rrez%';");
+    await pool.query("UPDATE public.rfcs SET promotor = REPLACE(promotor, 'ArgÃ¼elles', 'Argüelles') WHERE promotor LIKE '%ArgÃ¼elles%';");
+    await pool.query("UPDATE public.auth_users SET email = LOWER(email);");
     await pool.query("DELETE FROM public.sistemas WHERE nombre = 'EP';");
     await pool.query("UPDATE public.tqs_users SET sistemas = '{}' WHERE email = 'admin@easconsulting.com.mx';");
+    await pool.query("UPDATE public.sistemas SET owner_id = '00000000-0000-0000-0000-000000000013' WHERE nombre = 'CRM';");
+    await pool.query("UPDATE public.tqs_users SET sistemas = array_remove(sistemas, 'CRM') WHERE id = '00000000-0000-0000-0000-000000000011';");
+    await pool.query("UPDATE public.tqs_users SET sistemas = array_append(array_remove(sistemas, 'CRM'), 'CRM') WHERE id = '00000000-0000-0000-0000-000000000013';");
+    await pool.query("UPDATE public.rfcs SET owner_id = '00000000-0000-0000-0000-000000000013' WHERE sistema_name = 'CRM';");
+    await pool.query("UPDATE public.sistemas SET owner_id = '00000000-0000-0000-0000-000000000005', infraestructura = 'Azure' WHERE nombre = 'Zscaler';");
+    await pool.query("UPDATE public.tqs_users SET sistemas = array_append(array_remove(sistemas, 'Zscaler'), 'Zscaler') WHERE id = '00000000-0000-0000-0000-000000000005';");
+    await pool.query("UPDATE public.rfcs SET owner_id = '00000000-0000-0000-0000-000000000005', sistema_grupo = 'Zscaler', sid = NULL, infraestructura = 'Azure', ambiente = 'Azure' WHERE sistema_name = 'Zscaler';");
+    await pool.query("UPDATE public.sistemas SET owner_id = '00000000-0000-0000-0000-000000000005', infraestructura = 'Azure' WHERE nombre = 'CyberArk';");
+    await pool.query("UPDATE public.tqs_users SET sistemas = array_append(array_remove(sistemas, 'CyberArk'), 'CyberArk') WHERE id = '00000000-0000-0000-0000-000000000005';");
+    await pool.query("UPDATE public.rfcs SET sistema_name = 'CyberArk', owner_id = '00000000-0000-0000-0000-000000000005', sistema_grupo = 'CyberArk', sid = NULL, infraestructura = 'Azure', ambiente = 'Azure' WHERE sistema_name ILIKE '%cyberark%';");
+    await pool.query("UPDATE public.sistemas SET owner_id = '00000000-0000-0000-0000-000000000005', infraestructura = 'Azure' WHERE nombre = 'IAC';");
+    await pool.query("UPDATE public.tqs_users SET sistemas = array_append(array_remove(sistemas, 'IAC'), 'IAC') WHERE id = '00000000-0000-0000-0000-000000000005';");
+    await pool.query("UPDATE public.rfcs SET sistema_name = 'IAC', owner_id = '00000000-0000-0000-0000-000000000005', sistema_grupo = 'IAC', sid = NULL, infraestructura = 'Azure', ambiente = 'Azure' WHERE sistema_name ILIKE '%iac%' OR sistema_name ILIKE '%terraform%' OR sistema_name ILIKE '%ansible%';");
     logger.info('DB Schema migrations & constraints auto-applied on startup.');
   } catch (migErr) {
     logger.error({ err: migErr.message }, 'DB_AUTO_MIGRATION_ERROR');
@@ -143,6 +181,7 @@ pool.query('SELECT 1').then(async () => {
 
 pool.on('error', (err) => {
   logger.error({ err: err.message }, 'PG_POOL_ERROR');
+  logApp('ERROR', 'DATABASE', `Error inesperado en pool de PostgreSQL: ${err.message}`, err.stack).catch(() => { });
 });
 
 app.use(helmet({
@@ -282,41 +321,66 @@ const staticOptions = {
   }
 };
 
+app.use(express.static(path.join(__dirname, 'frontend'), staticOptions));
+app.use(express.static(path.join(__dirname, '..', 'frontend'), staticOptions));
 app.use(express.static(path.join(__dirname, '..'), staticOptions));
 app.use(express.static(__dirname, staticOptions));
 
 app.get('/styles.css', (req, res) => {
   res.setHeader('Content-Type', 'text/css; charset=UTF-8');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  const localStylesPath = path.join(__dirname, 'styles.css');
-  if (fs.existsSync(localStylesPath)) return res.sendFile(localStylesPath, staticOptions);
-  const rootStylesPath = path.join(__dirname, '..', 'styles.css');
-  if (fs.existsSync(rootStylesPath)) return res.sendFile(rootStylesPath, staticOptions);
+  const candidates = [
+    path.join(__dirname, 'frontend', 'styles.css'),
+    path.join(__dirname, '..', 'frontend', 'styles.css'),
+    path.join(__dirname, 'styles.css'),
+    path.join(__dirname, '..', 'styles.css')
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return res.sendFile(p, staticOptions);
+  }
   res.status(404).send('styles.css not found');
 });
 
 app.get(['/favicon.png', '/favicon.ico'], (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  const localFaviconPath = path.join(__dirname, 'favicon.png');
-  if (fs.existsSync(localFaviconPath)) return res.sendFile(localFaviconPath, staticOptions);
-  const rootFaviconPath = path.join(__dirname, '..', 'favicon.png');
-  if (fs.existsSync(rootFaviconPath)) return res.sendFile(rootFaviconPath, staticOptions);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  const candidates = [
+    path.join(__dirname, 'frontend', 'favicon.png'),
+    path.join(__dirname, '..', 'frontend', 'favicon.png'),
+    path.join(__dirname, 'favicon.png'),
+    path.join(__dirname, '..', 'favicon.png')
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return res.sendFile(p, staticOptions);
+  }
   res.status(404).send('favicon not found');
+});
+
+// CI/CD Health Check Endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'atlas-backend',
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get('/', (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  const localIndexPath = path.join(__dirname, 'index.html');
-  if (fs.existsSync(localIndexPath)) return res.sendFile(localIndexPath, staticOptions);
-  const rootIndexPath = path.join(__dirname, '..', 'index.html');
-  if (fs.existsSync(rootIndexPath)) return res.sendFile(rootIndexPath, staticOptions);
+  const candidates = [
+    path.join(__dirname, 'frontend', 'index.html'),
+    path.join(__dirname, '..', 'frontend', 'index.html'),
+    path.join(__dirname, 'index.html'),
+    path.join(__dirname, '..', 'index.html')
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return res.sendFile(p, staticOptions);
+  }
   res.status(200).send(`
     <!DOCTYPE html>
     <html lang="es">
@@ -341,7 +405,7 @@ const logApp = async (nivel, modulo, mensaje, stackTrace = null, requestInfo = {
     if (typeof global.auditFailureCount === 'undefined') global.auditFailureCount = 0;
     global.auditFailureCount++;
   }
-  
+
   const logData = { modulo, mensaje, stackTrace, requestInfo };
   if (nivel === 'ERROR' || nivel === 'CRITICAL') {
     logger.error(logData, 'Application log');
@@ -363,7 +427,7 @@ const logAudit = async (usuarioId, usuarioEmail, ipAddress, accion, modulo = 'AU
     if (typeof global.auditFailureCount === 'undefined') global.auditFailureCount = 0;
     global.auditFailureCount++;
   }
-  
+
   logger.info({ usuarioId, usuarioEmail, ipAddress, accion, modulo, nivel, detalles }, 'Audit log');
 };
 
@@ -378,17 +442,17 @@ const logActivity = async (usuarioId, usuarioEmail, entidad, entidadId, accion, 
     if (typeof global.auditFailureCount === 'undefined') global.auditFailureCount = 0;
     global.auditFailureCount++;
   }
-  
+
   logger.info({ usuarioId, usuarioEmail, entidad, entidadId, accion, resumen, cambios }, 'Activity log');
 };
 
 app.use((req, res, next) => {
   req.id = crypto.randomUUID();
   req.startTime = Date.now();
-  
+
   let errorPayload = null;
   const originalJson = res.json;
-  res.json = function(body) {
+  res.json = function (body) {
     if (res.statusCode >= 400 && body) {
       errorPayload = body;
     }
@@ -396,7 +460,7 @@ app.use((req, res, next) => {
   };
 
   const originalSend = res.send;
-  res.send = function(body) {
+  res.send = function (body) {
     if (res.statusCode >= 400 && body && !errorPayload) {
       try {
         errorPayload = typeof body === 'string' ? JSON.parse(body) : body;
@@ -424,7 +488,7 @@ app.use((req, res, next) => {
       query: sanitize(req.query),
       headers: sanitize(req.headers),
     };
-    
+
     if (res.statusCode >= 500) {
       logger.error(logData, `HTTP ${req.method} ${req.url} responded with ${res.statusCode}`);
     } else if (res.statusCode >= 400) {
@@ -432,10 +496,10 @@ app.use((req, res, next) => {
     } else {
       logger.info(logData, `HTTP ${req.method} ${req.url} responded with ${res.statusCode}`);
     }
-    
+
     if (res.statusCode >= 400) {
-      const detailStr = errorPayload?.details 
-        ? JSON.stringify(errorPayload.details) 
+      const detailStr = errorPayload?.details
+        ? JSON.stringify(errorPayload.details)
         : errorPayload?.error && typeof errorPayload.error === 'object'
           ? JSON.stringify(errorPayload.error)
           : null;
@@ -462,7 +526,7 @@ app.use((req, res, next) => {
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
+
   if (!token || token === process.env.SB_ANON) {
     req.user = null;
     return next();
@@ -488,7 +552,7 @@ const requireRole = (...roles) => async (req, res, next) => {
       const uRes = await pool.query('SELECT rol FROM public.tqs_users WHERE id = $1', [req.user.sub]);
       userRole = uRes.rows[0]?.rol || 'fte';
       req.user.role = userRole;
-    } catch(e) {
+    } catch (e) {
       userRole = 'fte';
     }
   }
@@ -527,60 +591,67 @@ const adminUserSchema = z.object({
 
 const rfcsInsertSchema = z.object({
   ticket: z.string().min(1),
-  tipo: z.string().optional(),
-  ambiente: z.string().optional(),
+  tipo: z.string().nullable().optional(),
+  ambiente: z.string().nullable().optional(),
+  infraestructura: z.string().nullable().optional(),
   fecha: z.string().min(1),
   fecha_fin: z.string().nullable().optional(),
   fecha_fin_retorno: z.string().nullable().optional(),
-  sistema_name: z.string().optional(),
-  sistema_grupo: z.string().optional(),
-  sid: z.string().optional(),
-  promotor: z.string().optional(),
-  coordinador_kof: z.string().optional(),
-  descripcion: z.string().optional(),
-  observaciones: z.string().optional(),
-  status: z.string().optional(),
-  hora_inicio: z.string().optional(),
-  hora_fin: z.string().optional(),
-  hora_fin_retorno: z.string().optional(),
-  owner_id: z.string().uuid().optional(),
-  tqs_ids: z.array(z.string().uuid()).optional(),
+  sistema_name: z.string().nullable().optional(),
+  sistema_grupo: z.string().nullable().optional(),
+  sid: z.string().nullable().optional(),
+  promotor: z.string().nullable().optional(),
+  coordinador_kof: z.string().nullable().optional(),
+  descripcion: z.string().nullable().optional(),
+  observaciones: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
+  hora_inicio: z.string().nullable().optional(),
+  hora_fin: z.string().nullable().optional(),
+  hora_fin_retorno: z.string().nullable().optional(),
+  owner_id: z.string().uuid().nullable().optional(),
+  tqs_ids: z.array(z.string().uuid()).nullable().optional(),
+  aprobado_por_cliente: z.boolean().nullable().optional(),
+  aprobado_por_cliente_nombre: z.string().nullable().optional(),
+  aprobado_por_cliente_fecha: z.string().nullable().optional(),
 });
 
 const solicitudesInsertSchema = z.object({
-  tipo: z.enum(['KIT', 'Incidente', 'RCA', 'Requerimiento', 'Actividad']),
-  origen: z.enum(['DXC', 'KOF']).optional(),
+  ticket: z.string().nullable().optional(),
+  tipo: z.string().min(1),
+  origen: z.string().nullable().optional(),
   fecha_inicio: z.string().min(1),
-  sistema_sap: z.string().optional(),
-  responsable: z.string().optional(),
-  estatus: z.string().optional(),
-  descripcion: z.string().optional(),
-  titulo: z.string().optional(),
-  action_items: z.array(z.any()).optional(),
-  bitacora: z.array(z.any()).optional(),
-  owner_id: z.string().uuid().optional(),
-  tqs_ids: z.array(z.string().uuid()).optional(),
+  sistema_sap: z.string().nullable().optional(),
+  ambiente: z.string().nullable().optional(),
+  responsable: z.string().nullable().optional(),
+  estatus: z.string().nullable().optional(),
+  descripcion: z.string().nullable().optional(),
+  titulo: z.string().nullable().optional(),
+  action_items: z.array(z.any()).nullable().optional(),
+  bitacora: z.array(z.any()).nullable().optional(),
+  estatus_historial: z.array(z.any()).nullable().optional(),
+  owner_id: z.string().uuid().nullable().optional(),
+  tqs_ids: z.array(z.string().uuid()).nullable().optional(),
 });
 
 const sistemasInsertSchema = z.object({
   nombre: z.string().min(1),
-  infraestructura: z.enum(['OnPremise', 'Azure']).optional(),
+  infraestructura: z.enum(['OnPremise', 'Azure', 'Ambos']).optional(),
   tipo_sap: z.enum(['SAP', 'No SAP']).optional(),
   criticidad: z.number().int().min(1).max(3).optional(),
-  owner_id: z.string().uuid().nullable().optional(),
-  backup_id: z.string().uuid().nullable().optional(),
+  owner_id: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
+  backup_id: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
   activo: z.boolean().optional(),
 });
 
 const ALLOWED_COLUMNS = {
-  rfcs: ['id', 'ticket', 'tipo', 'ambiente', 'fecha', 'fecha_fin', 'fecha_fin_retorno', 'sistema_name', 'sistema_grupo', 'sid', 'promotor', 'coordinador_kof', 'descripcion', 'observaciones', 'status', 'hora_inicio', 'hora_fin', 'hora_fin_retorno', 'owner_id', 'tqs_ids', 'created_at', 'updated_at', 'deleted_at'],
-  solicitudes: ['id', 'ticket', 'tipo', 'origen', 'fecha_inicio', 'sistema_sap', 'responsable', 'estatus', 'descripcion', 'titulo', 'action_items', 'bitacora', 'owner_id', 'tqs_ids', 'created_at', 'updated_at', 'deleted_at'],
+  rfcs: ['id', 'ticket', 'tipo', 'ambiente', 'infraestructura', 'fecha', 'fecha_fin', 'fecha_fin_retorno', 'sistema_name', 'sistema_grupo', 'sid', 'promotor', 'coordinador_kof', 'descripcion', 'observaciones', 'status', 'hora_inicio', 'hora_fin', 'hora_fin_retorno', 'owner_id', 'tqs_ids', 'created_at', 'updated_at', 'deleted_at', 'aprobado_por_cliente', 'aprobado_por_cliente_nombre', 'aprobado_por_cliente_fecha'],
+  solicitudes: ['id', 'ticket', 'tipo', 'origen', 'fecha_inicio', 'sistema_sap', 'ambiente', 'responsable', 'estatus', 'descripcion', 'titulo', 'action_items', 'bitacora', 'estatus_historial', 'owner_id', 'tqs_ids', 'created_at', 'updated_at', 'deleted_at'],
   tqs_users: ['id', 'nombre', 'email', 'rol', 'sistemas', 'siguiendo_tqs', 'backup_tqs_id', 'activo', 'primer_login', 'created_at', 'updated_at'],
   sistemas: ['id', 'nombre', 'infraestructura', 'tipo_sap', 'criticidad', 'owner_id', 'backup_id', 'activo', 'created_at', 'updated_at'],
-  log_aplicacion: ['id', 'nivel', 'modulo', 'mensaje', 'stack_trace', 'request_info', 'created_at'],
-  log_auditoria: ['id', 'usuario_id', 'usuario_email', 'ip_address', 'accion', 'modulo', 'nivel', 'detalles', 'created_at'],
-  log_actividades: ['id', 'usuario_id', 'usuario_email', 'entidad', 'entidad_id', 'accion', 'resumen', 'cambios', 'created_at'],
-  log_sincronizacion: ['id', 'entidad', 'entidad_id', 'accion', 'estado', 'detalles', 'created_at'],
+  log_aplicacion: ['id', 'nivel', 'modulo', 'mensaje', 'stack_trace', 'request_info', 'fecha', 'created_at'],
+  log_auditoria: ['id', 'usuario_id', 'usuario_email', 'ip_address', 'accion', 'modulo', 'nivel', 'detalles', 'fecha', 'created_at'],
+  log_actividades: ['id', 'usuario_id', 'usuario_email', 'entidad', 'entidad_id', 'accion', 'resumen', 'cambios', 'fecha', 'created_at'],
+  log_sincronizacion: ['id', 'tipo_error', 'detalle', 'fecha', 'entidad', 'entidad_id', 'accion', 'estado', 'detalles', 'created_at'],
   auth_users: ['id', 'email', 'password_hash', 'raw_user_meta_data', 'created_at', 'updated_at'],
   refresh_tokens: ['id', 'user_id', 'token_hash', 'expires_at', 'created_ip', 'revoked_at', 'revoked_ip', 'created_at'],
 };
@@ -607,12 +678,12 @@ app.post('/auth/v1/signup', async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      
+
       const userRes = await client.query(
         'INSERT INTO public.auth_users (email, password_hash, raw_user_meta_data) VALUES ($1, $2, $3) RETURNING id, email, raw_user_meta_data',
         [email.toLowerCase(), passwordHash, JSON.stringify(metadata)]
       );
-      
+
       const createdUser = userRes.rows[0];
 
       if (metadata.nombre || metadata.rol || metadata.sistemas || metadata.backup_tqs_id) {
@@ -625,13 +696,13 @@ app.post('/auth/v1/signup', async (req, res) => {
       await client.query('COMMIT');
 
       const token = jwt.sign(
-        { sub: createdUser.id, email: createdUser.email, role: 'fte' }, 
-        JWT_SECRET, 
+        { sub: createdUser.id, email: createdUser.email, role: 'fte' },
+        JWT_SECRET,
         { expiresIn: '24h', issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
       );
       const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
       const { token: refreshToken, expiresAt } = await generateRefreshToken(createdUser.id, clientIp);
-      
+
       res.status(200).json({
         access_token: token,
         token_type: 'bearer',
@@ -692,7 +763,7 @@ async function generateRefreshToken(userId, clientIp) {
   const token = crypto.randomBytes(64).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-  
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS public.refresh_tokens (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -705,13 +776,13 @@ async function generateRefreshToken(userId, clientIp) {
       revoked_ip VARCHAR(45),
       replaced_by_token_hash VARCHAR(255)
     );
-  `).catch(() => {});
+  `).catch(() => { });
 
   await pool.query(
     `INSERT INTO public.refresh_tokens (user_id, token_hash, expires_at, created_ip) VALUES ($1, $2, $3, $4)`,
     [userId, tokenHash, expiresAt, clientIp]
   );
-  
+
   return { token, tokenHash, expiresAt };
 }
 
@@ -728,13 +799,13 @@ async function revokeRefreshToken(token, userId, revokedIp, replacedByToken = nu
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const updateFields = ['revoked_at = NOW()', 'revoked_ip = $1'];
   const params = [revokedIp, userId, tokenHash];
-  
+
   if (replacedByToken) {
     const replacedHash = crypto.createHash('sha256').update(replacedByToken).digest('hex');
     updateFields.push('replaced_by_token_hash = $4');
     params.push(replacedHash);
   }
-  
+
   await pool.query(
     `UPDATE public.refresh_tokens SET ${updateFields.join(', ')} WHERE user_id = $2 AND token_hash = $3`,
     params
@@ -768,18 +839,24 @@ app.post('/auth/v1/token', async (req, res) => {
 
   try {
     let userRes = await pool.query(
-      `SELECT * FROM public.auth_users 
-       WHERE LOWER(email) = LOWER($1) 
-          OR LOWER(email) = LOWER($2) 
-          OR LOWER(email) = LOWER($3) 
-          OR LOWER(email) = LOWER($4) 
-          OR LOWER(email) LIKE LOWER($5) 
-       ORDER BY id ASC LIMIT 1`,
-      [cleanInput, domainVariant1, domainVariant2, domainVariant3, usernamePrefix + '@%']
+      `SELECT * FROM public.auth_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [cleanInput]
     );
-    
+
     if (userRes.rows.length === 0) {
-      logAudit(null, cleanEmail, clientIp, 'LOGIN_FAILED', 'AUTH', 'WARN', { motivo: 'Usuario no encontrado' });
+      userRes = await pool.query(
+        `SELECT * FROM public.auth_users 
+         WHERE LOWER(email) = LOWER($1) 
+            OR LOWER(email) = LOWER($2) 
+            OR LOWER(email) = LOWER($3) 
+            OR LOWER(email) LIKE LOWER($4) 
+         ORDER BY created_at DESC LIMIT 1`,
+        [domainVariant1, domainVariant2, domainVariant3, usernamePrefix + '@%']
+      );
+    }
+
+    if (userRes.rows.length === 0) {
+      logAudit(null, cleanInput, clientIp, 'LOGIN_FAILED', 'AUTH', 'WARN', { motivo: 'Usuario no encontrado' });
       return res.status(400).json({ error: 'Credenciales inválidas' });
     }
 
@@ -799,16 +876,16 @@ app.post('/auth/v1/token', async (req, res) => {
 
     const realRole = profileRes.rows[0]?.rol || 'fte';
 
-    await pool.query('UPDATE public.tqs_users SET primer_login = false WHERE id = $1', [user.id]).catch(() => {});
+    await pool.query('UPDATE public.tqs_users SET primer_login = false WHERE id = $1', [user.id]).catch(() => { });
 
     const token = jwt.sign(
-      { sub: user.id, email: user.email, role: realRole }, 
-      JWT_SECRET, 
+      { sub: user.id, email: user.email, role: realRole },
+      JWT_SECRET,
       { expiresIn: '24h', issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
     );
-    
+
     const { token: refreshToken, expiresAt } = await generateRefreshToken(user.id, clientIp);
-    
+
     logAudit(user.id, user.email, clientIp, 'LOGIN_SUCCESS', 'AUTH', 'INFO', { timestamp: new Date().toISOString() });
 
     res.status(200).json({
@@ -888,7 +965,7 @@ app.post('/auth/v1/recover', async (req, res) => {
         ALTER TABLE public.auth_users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMP;
         ALTER TABLE public.tqs_users ADD COLUMN IF NOT EXISTS reset_code VARCHAR(20);
         ALTER TABLE public.tqs_users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMP;
-      `).catch(() => {});
+      `).catch(() => { });
 
       await pool.query(
         'UPDATE public.auth_users SET reset_code = $1, reset_expires = $2 WHERE id = $3',
@@ -897,12 +974,12 @@ app.post('/auth/v1/recover', async (req, res) => {
       await pool.query(
         'UPDATE public.tqs_users SET reset_code = $1, reset_expires = $2 WHERE id = $3',
         [resetCode, expiresAt, user.id]
-      ).catch(() => {});
+      ).catch(() => { });
 
-logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_ADMIN_RESET', 'AUTH', 'INFO', { 
-        resetCode, 
+      logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_ADMIN_RESET', 'AUTH', 'INFO', {
+        resetCode,
         adminId: req.user.sub,
-        adminEmail: req.user.email 
+        adminEmail: req.user.email
       });
 
       return res.status(200).json({
@@ -916,7 +993,7 @@ logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_ADMIN_RESET', 'AUTH',
       if (security_answer && securityQuestions.length > 0) {
         const question = securityQuestions[0];
         const answerHash = crypto.createHash('sha256').update(security_answer.trim().toLowerCase()).digest('hex');
-        
+
         if (question.answer_hash !== answerHash) {
           logAudit(user.id, cleanEmail, clientIp, 'SECURITY_QUESTION_FAILED', 'AUTH', 'WARN');
           return res.status(400).json({ error: 'Respuesta de seguridad incorrecta' });
@@ -931,7 +1008,7 @@ logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_ADMIN_RESET', 'AUTH',
         ALTER TABLE public.auth_users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMP;
         ALTER TABLE public.tqs_users ADD COLUMN IF NOT EXISTS reset_code VARCHAR(20);
         ALTER TABLE public.tqs_users ADD COLUMN IF NOT EXISTS reset_expires TIMESTAMP;
-      `).catch(() => {});
+      `).catch(() => { });
 
       await pool.query(
         'UPDATE public.auth_users SET reset_code = $1, reset_expires = $2 WHERE id = $3',
@@ -940,9 +1017,9 @@ logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_ADMIN_RESET', 'AUTH',
       await pool.query(
         'UPDATE public.tqs_users SET reset_code = $1, reset_expires = $2 WHERE id = $3',
         [resetCode, expiresAt, user.id]
-      ).catch(() => {});
+      ).catch(() => { });
 
-logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_SECURITY_QUESTION', 'AUTH', 'INFO', { resetCode });
+      logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_SECURITY_QUESTION', 'AUTH', 'INFO', { resetCode });
 
       // 1. Enviar correo SMTP directo por Outlook (100% garantizado)
       try {
@@ -967,7 +1044,7 @@ logAudit(user.id, user.email, clientIp, 'PASSWORD_RECOVERY_SECURITY_QUESTION', '
             nombre: meta.nombre || user.email
           })
         }).catch(e => console.warn('[N8N_RECOVER_WEBHOOK_WARN]', e.message));
-      } catch (e) {}
+      } catch (e) { }
 
       return res.status(200).json({
         ok: true,
@@ -1001,7 +1078,7 @@ app.post('/auth/v1/security-questions', authenticateToken, requireAuth, async (r
 
     const meta = userRes.rows[0].raw_user_meta_data || {};
     const questions = meta.security_questions || [];
-    
+
     const questionMap = {
       'birth_city': '¿En qué ciudad naciste?',
       'first_pet': '¿Cuál fue el nombre de tu primera mascota?',
@@ -1035,7 +1112,7 @@ app.post('/auth/v1/security-questions', authenticateToken, requireAuth, async (r
 
 app.get('/auth/v1/security-questions/:userId', authenticateToken, requireAuth, async (req, res) => {
   const { userId } = req.params;
-  
+
   if (req.user.sub !== userId && !['admin', 'director'].includes(req.user.role)) {
     return res.status(403).json({ error: 'No autorizado' });
   }
@@ -1047,7 +1124,7 @@ app.get('/auth/v1/security-questions/:userId', authenticateToken, requireAuth, a
     const meta = userRes.rows[0].raw_user_meta_data || {};
     const questions = meta.security_questions || [];
     const safeQuestions = questions.map(q => ({ id: q.id, question: q.question }));
-    
+
     return res.status(200).json({ questions: safeQuestions });
   } catch (err) {
     return res.status(500).json({ error: 'Error al obtener preguntas de seguridad' });
@@ -1096,7 +1173,7 @@ app.post('/auth/v1/reset-password', async (req, res) => {
     await pool.query(
       'UPDATE public.tqs_users SET password_hash = $1, reset_code = NULL, reset_expires = NULL WHERE id = $2',
       [newHash, user.id]
-    ).catch(() => {});
+    ).catch(() => { });
 
     logAudit(user.id, cleanEmail, clientIp, 'PASSWORD_RESET_SUCCESS', 'AUTH', 'INFO');
 
@@ -1132,7 +1209,7 @@ app.get('/auth/v1/user', authenticateToken, requireAuth, async (req, res) => {
   try {
     const userRes = await pool.query('SELECT id, email, raw_user_meta_data FROM public.auth_users WHERE id = $1', [req.user.sub]);
     if (userRes.rows.length === 0) return res.status(404).json({ error: 'user not found' });
-    
+
     const user = userRes.rows[0];
     res.status(200).json({
       id: user.id,
@@ -1174,11 +1251,11 @@ app.post('/auth/v1/logout', authenticateToken, requireAuth, async (req, res) => 
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
+
   if (token && token !== process.env.SB_ANON) {
-    await revokeRefreshToken(token, req.user.sub, clientIp).catch(() => {});
+    await revokeRefreshToken(token, req.user.sub, clientIp).catch(() => { });
   }
-  
+
   logAudit(req.user.sub, req.user.email, clientIp, 'LOGOUT', 'AUTH', 'INFO', { timestamp: new Date().toISOString() });
   res.status(200).json({});
 });
@@ -1186,42 +1263,42 @@ app.post('/auth/v1/logout', authenticateToken, requireAuth, async (req, res) => 
 app.post('/auth/v1/refresh', async (req, res) => {
   const { refresh_token } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-  
+
   if (!refresh_token) {
     return res.status(400).json({ error: 'refresh_token requerido' });
   }
-  
+
   try {
     const decoded = jwt.verify(refresh_token, JWT_SECRET, { issuer: JWT_ISSUER, audience: JWT_AUDIENCE });
     const userId = decoded.sub;
-    
+
     const valid = await verifyRefreshToken(refresh_token, userId);
     if (!valid) {
       await pool.query(
         `UPDATE public.refresh_tokens SET revoked_at = NOW(), revoked_ip = $1 WHERE user_id = $2 AND token_hash = $3`,
         [clientIp, userId, crypto.createHash('sha256').update(refresh_token).digest('hex')]
-      ).catch(() => {});
+      ).catch(() => { });
       return res.status(403).json({ error: 'Refresh token inválido o revocado' });
     }
-    
+
     const profileRes = await pool.query('SELECT email, rol FROM public.auth_users au JOIN public.tqs_users tu ON au.id = tu.id WHERE au.id = $1', [userId]);
     if (profileRes.rows.length === 0) {
       return res.status(403).json({ error: 'Usuario no encontrado' });
     }
-    
+
     const user = profileRes.rows[0];
     if (!user.rol || user.rol === 'authenticated') {
       return res.status(403).json({ error: 'Rol no válido' });
     }
-    
+
     const { token: newRefreshToken, expiresAt } = await rotateRefreshToken(refresh_token, userId, clientIp);
-    
+
     const newAccessToken = jwt.sign(
-      { sub: userId, email: user.email, role: user.rol }, 
-      JWT_SECRET, 
+      { sub: userId, email: user.email, role: user.rol },
+      JWT_SECRET,
       { expiresIn: '24h', issuer: JWT_ISSUER, audience: JWT_AUDIENCE }
     );
-    
+
     res.status(200).json({
       access_token: newAccessToken,
       token_type: 'bearer',
@@ -1304,10 +1381,10 @@ const handleAdminUsers = async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
-if (action === 'delete') {
+    if (action === 'delete') {
       if (!id) return res.status(400).json({ error: 'User id is required' });
       if (id === adminId) return res.status(400).json({ error: 'No puede eliminarse a sí mismo' });
-      
+
       // Check if this is the last admin
       const adminCountRes = await client.query(
         `SELECT COUNT(*) FROM public.tqs_users WHERE rol = 'admin' AND activo = true`
@@ -1315,11 +1392,11 @@ if (action === 'delete') {
       const adminCount = parseInt(adminCountRes.rows[0].count, 10);
       const targetUserRes = await client.query(`SELECT rol FROM public.tqs_users WHERE id = $1`, [id]);
       const targetIsAdmin = targetUserRes.rows[0]?.rol === 'admin';
-      
+
       if (targetIsAdmin && adminCount <= 1) {
         return res.status(400).json({ error: 'No puede eliminar el último administrador activo' });
       }
-      
+
       await client.query('DELETE FROM public.auth_users WHERE id = $1', [id]);
       logAudit(adminId, adminEmail, clientIp, 'USER_DELETED', 'USER_ADMIN', 'CRITICAL', { targetUserId: id });
       return res.status(200).json({ ok: true });
@@ -1400,44 +1477,47 @@ function parseFilters(query, tableName) {
       continue;
     }
 
-    if (typeof val !== 'string') continue;
+    const valList = Array.isArray(val) ? val : [val];
+    for (const vItem of valList) {
+      if (typeof vItem !== 'string') continue;
 
-    if (val.startsWith('eq.')) {
-      const v = val.replace('eq.', '');
-      if (v === 'null') {
-        conditions.push(`${key} IS NULL`);
-      } else {
-        conditions.push(`${key} = $${paramIndex++}`);
-        values.push(v === 'true' ? true : v === 'false' ? false : v);
+      if (vItem.startsWith('eq.')) {
+        const v = vItem.replace('eq.', '');
+        if (v === 'null') {
+          conditions.push(`${key} IS NULL`);
+        } else {
+          conditions.push(`${key} = $${paramIndex++}`);
+          values.push(v === 'true' ? true : v === 'false' ? false : v);
+        }
+      } else if (vItem.startsWith('neq.')) {
+        const v = vItem.replace('neq.', '');
+        if (v === 'null') {
+          conditions.push(`${key} IS NOT NULL`);
+        } else {
+          conditions.push(`${key} != $${paramIndex++}`);
+          values.push(v === 'true' ? true : v === 'false' ? false : v);
+        }
+      } else if (vItem.startsWith('gte.')) {
+        conditions.push(`${key} >= $${paramIndex++}`);
+        values.push(vItem.replace('gte.', ''));
+      } else if (vItem.startsWith('lte.')) {
+        conditions.push(`${key} <= $${paramIndex++}`);
+        values.push(vItem.replace('lte.', ''));
+      } else if (vItem.startsWith('gt.')) {
+        conditions.push(`${key} > $${paramIndex++}`);
+        values.push(vItem.replace('gt.', ''));
+      } else if (vItem.startsWith('lt.')) {
+        conditions.push(`${key} < $${paramIndex++}`);
+        values.push(vItem.replace('lt.', ''));
+      } else if (vItem.startsWith('ilike.')) {
+        conditions.push(`${key} ILIKE $${paramIndex++}`);
+        values.push(vItem.replace('ilike.', ''));
+      } else if (vItem.startsWith('in.')) {
+        const cleanList = vItem.replace(/^in\.\(|\)$/g, '');
+        const listParts = cleanList.split(',');
+        conditions.push(`${key} = ANY($${paramIndex++})`);
+        values.push(listParts);
       }
-    } else if (val.startsWith('neq.')) {
-      const v = val.replace('neq.', '');
-      if (v === 'null') {
-        conditions.push(`${key} IS NOT NULL`);
-      } else {
-        conditions.push(`${key} != $${paramIndex++}`);
-        values.push(v === 'true' ? true : v === 'false' ? false : v);
-      }
-    } else if (val.startsWith('gte.')) {
-      conditions.push(`${key} >= $${paramIndex++}`);
-      values.push(val.replace('gte.', ''));
-    } else if (val.startsWith('lte.')) {
-      conditions.push(`${key} <= $${paramIndex++}`);
-      values.push(val.replace('lte.', ''));
-    } else if (val.startsWith('gt.')) {
-      conditions.push(`${key} > $${paramIndex++}`);
-      values.push(val.replace('gt.', ''));
-    } else if (val.startsWith('lt.')) {
-      conditions.push(`${key} < $${paramIndex++}`);
-      values.push(val.replace('lt.', ''));
-    } else if (val.startsWith('ilike.')) {
-      conditions.push(`${key} ILIKE $${paramIndex++}`);
-      values.push(val.replace('ilike.', ''));
-    } else if (val.startsWith('in.')) {
-      const cleanList = val.replace(/^in\.\(|\)$/g, '');
-      const listParts = cleanList.split(',');
-      conditions.push(`${key} = ANY($${paramIndex++})`);
-      values.push(listParts);
     }
   }
 
@@ -1446,6 +1526,15 @@ function parseFilters(query, tableName) {
     values,
     paramCount: paramIndex - 1
   };
+}
+
+let rfcsMemoryCache = null;
+let rfcsMemoryCacheTime = 0;
+const RFC_CACHE_TTL = 30000; // 30 segundos de cache en RAM ultra-rápido
+
+function invalidateRfcsCache() {
+  rfcsMemoryCache = null;
+  rfcsMemoryCacheTime = 0;
 }
 
 app.get('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => {
@@ -1458,7 +1547,13 @@ app.get('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => {
 
   try {
     const { whereClause, values } = parseFilters(req.query, table);
-    
+
+    // Check in-memory RAM cache for full rfcs requests (0 ms response)
+    const isFullRfcsQuery = table === 'rfcs' && !whereClause && (!select || select === '*') && (!order || order === 'fecha.desc');
+    if (isFullRfcsQuery && rfcsMemoryCache && (Date.now() - rfcsMemoryCacheTime < RFC_CACHE_TTL)) {
+      return res.status(200).json(rfcsMemoryCache);
+    }
+
     let selectCols = '*';
     if (select && select !== '*') {
       const allowedCols = ALLOWED_COLUMNS[table] || [];
@@ -1472,20 +1567,31 @@ app.get('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => {
 
     let orderClause = '';
     if (order) {
-      const [col, dir] = order.split('.');
+      const parts = String(order).split('.');
+      const col = parts[0];
+      const dir = parts[1] ? parts[1].toLowerCase() : 'desc';
       const allowedCols = ALLOWED_COLUMNS[table] || [];
-      if (allowedCols.includes(col) && ['asc', 'desc'].includes(dir.toLowerCase())) {
+      if (allowedCols.includes(col) && ['asc', 'desc'].includes(dir)) {
         orderClause = `ORDER BY ${col} ${dir.toUpperCase()}`;
       }
+    }
+    if (!orderClause && ['log_auditoria', 'log_actividades', 'log_aplicacion', 'log_sincronizacion'].includes(table)) {
+      orderClause = 'ORDER BY fecha DESC';
     }
 
     let limitClause = '';
     if (limit && /^\d+$/.test(limit)) {
-      limitClause = `LIMIT ${Math.min(parseInt(limit), 1000)}`;
+      limitClause = `LIMIT ${Math.min(parseInt(limit), 100000)}`;
     }
 
     const sql = `SELECT ${selectCols} FROM public.${table} ${whereClause} ${orderClause} ${limitClause}`;
     const result = await pool.query(sql, values);
+
+    if (isFullRfcsQuery) {
+      rfcsMemoryCache = result.rows;
+      rfcsMemoryCacheTime = Date.now();
+    }
+
     res.status(200).json(result.rows);
   } catch (err) {
     logApp('ERROR', 'REST_API', `Error en GET /rest/v1/${table}`, err.stack);
@@ -1493,16 +1599,58 @@ app.get('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => {
   }
 });
 
+function normalizeRfcStatus(status) {
+  if (!status || typeof status !== 'string') return 'En espera de VOBO';
+  const norm = status.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (norm.includes('sin exito') || norm.includes('fall')) return 'Finalizado sin éxito';
+  if (norm.includes('exito') || norm.includes('concluid') || norm.includes('finalizad') || norm.includes('completad') || norm.includes('cerrad')) return 'Finalizado con éxito';
+  if (norm.includes('ejecuc') || norm.includes('proceso') || norm.includes('curs')) return 'En Ejecución';
+  if (norm.includes('vobo') || norm.includes('espera') || norm.includes('pendien')) return 'En espera de VOBO';
+  if (norm.includes('aprob')) return 'Aprobado';
+  if (norm.includes('cancel')) return 'Cancelado';
+  if (norm.includes('reprogram')) return 'Reprogramar';
+  if (norm.includes('borrador')) return 'Borrador';
+  return status.trim();
+}
+
+function normalizeTimeString(t) {
+  if (!t || typeof t !== 'string') return t;
+  const clean = t.trim();
+  if (!clean || clean === '—' || clean === 'N/A' || clean === '-') return null;
+  if (clean.includes(':')) {
+    const parts = clean.split(':');
+    let h = parseInt(parts[0].replace(/\D/g, ''), 10);
+    let m = parseInt(parts[1]?.replace(/\D/g, '') || '0', 10);
+    if (!isNaN(h)) {
+      if (h >= 24) h = h % 24;
+      if (m >= 60) m = m % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    }
+  }
+  return clean;
+}
+
 app.post('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => {
   const { table } = req.params;
-  
+
   if (!['rfcs', 'solicitudes', 'tqs_users', 'sistemas'].includes(table)) {
     return res.status(403).json({ error: 'forbidden table' });
   }
 
+  const rows = Array.isArray(req.body) ? req.body : [req.body];
+  if (rows.length === 0) return res.status(200).json([]);
+
+  if (table === 'rfcs') {
+    for (const r of rows) {
+      if (r.status !== undefined) r.status = normalizeRfcStatus(r.status);
+      if (r.hora_inicio !== undefined) r.hora_inicio = normalizeTimeString(r.hora_inicio);
+      if (r.hora_fin !== undefined) r.hora_fin = normalizeTimeString(r.hora_fin);
+      if (r.hora_fin_retorno !== undefined) r.hora_fin_retorno = normalizeTimeString(r.hora_fin_retorno);
+    }
+  }
+
   const schema = tableSchemas[table];
   if (schema) {
-    const rows = Array.isArray(req.body) ? req.body : [req.body];
     for (const row of rows) {
       const parsed = schema.safeParse(row);
       if (!parsed.success) {
@@ -1510,9 +1658,6 @@ app.post('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => 
       }
     }
   }
-
-  const rows = Array.isArray(req.body) ? req.body : [req.body];
-  if (rows.length === 0) return res.status(200).json([]);
 
   try {
     const inserted = [];
@@ -1524,7 +1669,18 @@ app.post('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => 
       const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
       const vals = keys.map(k => formatValForPg(row[k], k));
 
-      const sql = `INSERT INTO public.${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
+      let sql;
+      if (table === 'rfcs' && row.ticket) {
+        const updateCols = keys.filter(k => !['id', 'created_at', 'ticket'].includes(k));
+        const updateSets = updateCols.length > 0
+          ? updateCols.map(k => `${k} = EXCLUDED.${k}`).join(', ')
+          : 'updated_at = NOW()';
+        sql = `INSERT INTO public.rfcs (${cols}) VALUES (${placeholders})
+               ON CONFLICT (ticket, sistema_name, fecha) DO UPDATE SET ${updateSets}, updated_at = NOW()
+               RETURNING *`;
+      } else {
+        sql = `INSERT INTO public.${table} (${cols}) VALUES (${placeholders}) RETURNING *`;
+      }
       const result = await pool.query(sql, vals);
       const insertedRow = result.rows[0];
       inserted.push(insertedRow);
@@ -1539,7 +1695,8 @@ app.post('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => 
         { registro: insertedRow }
       );
     }
-    
+
+    if (table === 'rfcs') invalidateRfcsCache();
     res.status(201).json(Array.isArray(req.body) ? inserted : inserted[0]);
   } catch (err) {
     logApp('ERROR', 'REST_API', `Error en POST /rest/v1/${table}`, err.stack);
@@ -1558,6 +1715,27 @@ app.patch('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) =>
     const { whereClause, values: filterVals, paramCount: filterParamCount } = parseFilters(req.query, table);
     if (!whereClause) {
       return res.status(400).json({ error: 'Filters required for PATCH' });
+    }
+
+    if (table === 'rfcs') {
+      if (req.body.status !== undefined) req.body.status = normalizeRfcStatus(req.body.status);
+      if (req.body.hora_inicio !== undefined) req.body.hora_inicio = normalizeTimeString(req.body.hora_inicio);
+      if (req.body.hora_fin !== undefined) req.body.hora_fin = normalizeTimeString(req.body.hora_fin);
+      if (req.body.hora_fin_retorno !== undefined) req.body.hora_fin_retorno = normalizeTimeString(req.body.hora_fin_retorno);
+
+      // Regla Operativa Mandatoria: Un RFC aprobado puede reprogramarse, pero un RFC en ejecución NO se puede reprogramar
+      const targetStatus = (req.body.status || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (targetStatus.includes('reprogram')) {
+        const checkRows = await pool.query(`SELECT ticket, status FROM public.rfcs ${whereClause}`, filterVals);
+        for (const row of checkRows.rows) {
+          const curStatus = (row.status || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (curStatus.includes('ejecu') || curStatus.includes('proceso') || curStatus.includes('curs')) {
+            return res.status(400).json({
+              error: `Regla Operativa: El RFC ${row.ticket || ''} está actualmente 'En Ejecución' y no se puede reprogramar.`
+            });
+          }
+        }
+      }
     }
 
     const allowedCols = ALLOWED_COLUMNS[table] || [];
@@ -1586,7 +1764,7 @@ app.patch('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) =>
       const isStatusChange = req.body.status !== undefined || req.body.estatus !== undefined;
       const actType = isStatusChange ? 'STATUS_CHANGE' : 'UPDATE';
       const newStatus = req.body.status || req.body.estatus;
-      const summary = isStatusChange 
+      const summary = isStatusChange
         ? `Estatus actualizado a '${newStatus}' en ${table} (${updatedRow.ticket || updatedRow.tipo || 'ID: ' + updatedRow.id})`
         : `Actualización de registro en ${table} (${updatedRow.ticket || updatedRow.nombre || updatedRow.tipo || 'ID: ' + updatedRow.id})`;
 
@@ -1600,7 +1778,8 @@ app.patch('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) =>
         { cambios: req.body, resultado: updatedRow }
       );
     }
-    
+
+    if (table === 'rfcs') invalidateRfcsCache();
     res.status(200).json(result.rows);
   } catch (err) {
     logApp('ERROR', 'REST_API', `Error en PATCH /rest/v1/${table}`, err.stack);
@@ -1615,10 +1794,10 @@ app.delete('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) =
     return res.status(403).json({ error: 'forbidden table' });
   }
 
-try {
+  try {
     if (req.query.all === 'true') {
       if (table === 'rfcs' || table === 'solicitudes' || table === 'tqs_users' || table === 'sistemas') {
-        await pool.query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`).catch(() => {});
+        await pool.query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`).catch(() => { });
         await pool.query(`UPDATE public.${table} SET deleted_at = NOW() WHERE deleted_at IS NULL`);
       } else {
         await pool.query(`DELETE FROM public.${table}`);
@@ -1642,7 +1821,7 @@ try {
     let sql;
     if (table === 'rfcs' || table === 'solicitudes' || table === 'tqs_users') {
       // Ensure deleted_at column exists
-      await pool.query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`).catch(() => {});
+      await pool.query(`ALTER TABLE public.${table} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`).catch(() => { });
       sql = `UPDATE public.${table} SET deleted_at = NOW() ${whereClause.replace('WHERE', 'WHERE deleted_at IS NULL AND')} RETURNING *`;
     } else {
       sql = `DELETE FROM public.${table} ${whereClause} RETURNING *`;
@@ -1658,7 +1837,8 @@ try {
       `Eliminación de registro en ${table}`,
       { filtro: req.query }
     );
-    
+
+    if (table === 'rfcs') invalidateRfcsCache();
     res.status(204).end();
   } catch (err) {
     logApp('ERROR', 'REST_API', `Error en DELETE /rest/v1/${table}`, err.stack);
@@ -1666,7 +1846,114 @@ try {
   }
 });
 
-// Endpoint para Carga Inicial / Carga Masiva de RFCs asignadas a TQS Leader
+// Endpoint para Carga Inicial / Carga Masiva de RFCs con resolución automática de TQS
+
+// Funcion de normalizacion inteligente de sistemas para evitar variantes en carga masiva
+function normalizeSystemAndGroup(rawSys, rawSid) {
+  let sys = (rawSys || 'SAP General').replace(/^SAP\s+/i, '').trim();
+  let grupo = sys;
+  let sid = (rawSid || '').trim();
+
+  // Si contiene SID o ambiente entre parentesis, ej. "MII QA (M2Q)", extraerlo
+  const parenMatch = sys.match(/\(([^)]+)\)/);
+  if (parenMatch) {
+    const candidate = parenMatch[1].trim();
+    if (!sid || sid === 'PRD' || sid === 'QAS' || sid === 'DEV' || sid === 'PPRD') {
+      sid = candidate;
+    }
+  }
+
+  const sUpper = sys.toUpperCase();
+  if (sUpper.includes('MII')) {
+    grupo = 'MII';
+  } else if (sUpper.includes('DATA SERVICES') || sUpper.includes('BODS') || sUpper.includes('DKS') || sUpper.includes('PKS') || sUpper.includes('QKS')) {
+    grupo = 'BODS';
+  } else if (sUpper.includes('ADS')) {
+    grupo = 'ADS';
+  } else if (sUpper.includes('PI') || sUpper.includes('PO') || sUpper.includes('XCP') || sUpper.includes('XCQ') || sUpper.includes('XCD')) {
+    grupo = 'PI';
+  } else if (sUpper.includes('CENTRAL PROCUREMENT') || sUpper.includes('CPROC') || sUpper.includes('BOT')) {
+    grupo = 'Cproc / BOT';
+  } else if (sUpper.includes('TERRAFORM') || sUpper.includes('ANSIBLE') || sUpper === 'IAC') {
+    grupo = 'IAC';
+    sys = 'IAC';
+  } else if (sUpper.includes('SPAIPA')) {
+    grupo = 'Spaipa';
+    sys = 'Spaipa';
+  } else if (sUpper.includes('CONCENTRADOR HIST')) {
+    grupo = 'Concentrador Históricos';
+    sys = 'Concentrador Históricos';
+  } else if (sUpper.includes('IBP')) {
+    grupo = 'IBP Productivo';
+  } else if (sUpper.includes('S/4') || sUpper.includes('S4HANA') || sUpper.includes('S/4HANA')) {
+    grupo = 'S/4';
+  } else if (sUpper.includes('CLOUD CONNECTOR')) {
+    grupo = 'Cloud Connector';
+  } else if (sUpper.includes('DATA LAKE')) {
+    grupo = 'Data Lake';
+  } else if (sUpper.includes('DATA PROVISIONING')) {
+    grupo = 'Data Provisioning';
+  } else if (sUpper.includes('DATA STAGING')) {
+    grupo = 'Data Staging';
+  } else if (sUpper.includes('DYNATRACE') || sUpper.includes('ACTIVE GATE')) {
+    grupo = 'Dynatrace (KOF)';
+  } else if (sUpper.includes('EWM')) {
+    grupo = 'EWM';
+  } else if (sUpper.includes('SCM')) {
+    grupo = 'SCM';
+  } else if (sUpper.includes('SOLMAN')) {
+    grupo = 'Solman';
+  } else if (sUpper === 'ECC RAP' || sUpper.includes('ECC RAP')) {
+    grupo = 'ECC RAP';
+  } else if (sUpper === 'ECC RLP' || sUpper.includes('ECC RLP')) {
+    grupo = 'ECC RLP';
+  } else if (sUpper === 'ECC RVP' || sUpper.includes('ECC RVP')) {
+    grupo = 'ECC RVP';
+  } else if (sUpper.includes('ECC NO PRODUCTIVO') || sUpper.includes('ECC NO PROD')) {
+    grupo = 'ECC NO Productivos';
+  } else if (sUpper.includes('FOCUS RUN')) {
+    grupo = 'Focus Run';
+  } else if (sUpper.includes('INTEGRATION SUITE')) {
+    grupo = 'Integration Suite (BTP)';
+  } else if (sUpper.includes('BTP') || sUpper.includes('PAPM')) {
+    grupo = 'BTP / PaPM';
+  } else if (sUpper.includes('MULESOFT')) {
+    grupo = 'MuleSoft';
+  } else if (sUpper.includes('MS MISIÓN') || sUpper.includes('MS MISION')) {
+    grupo = 'MS Misión Critica - Azure';
+  } else if (sUpper.includes('BW HANA COMERCIAL') || sUpper.includes('BW COMERCIAL')) {
+    grupo = 'BW HANA Comercial';
+  } else if (sUpper.includes('BW HANA FINANCIERO') || sUpper.includes('BW FINANCIERO')) {
+    grupo = 'BW HANA Financiero';
+  } else if (sUpper.includes('CODE PROFILER')) {
+    grupo = 'Code Profiler for SAP';
+  } else if (sUpper.includes('CYBERARK')) {
+    grupo = 'CyberArk';
+  } else if (sUpper.includes('AUTOPASS') || sUpper.includes('AUTO PASS')) {
+    grupo = 'AutoPassReset';
+  } else if (sUpper === 'EP' || sUpper.includes('ENTERPRISE PORTAL')) {
+    grupo = 'EP';
+  } else if (sUpper.includes('FORTIGATE') || sUpper.includes('FORTIDDNS')) {
+    grupo = 'FortiGate Firewall (FortiDDNS)';
+  } else if (sUpper.includes('MID SERVER')) {
+    grupo = 'Mid Server';
+  } else if (sUpper === 'MID') {
+    grupo = 'MID';
+  } else if (sUpper.includes('NWDI')) {
+    grupo = 'NWDI';
+  } else if (sUpper.includes('SENTINEL')) {
+    grupo = 'Sentinel';
+  } else if (sUpper.includes('ZSCALER')) {
+    grupo = 'Zscaler';
+  } else if (sUpper.includes('RESTAURACIONES NO ECC')) {
+    grupo = 'Restauraciones No ECC';
+  } else if (sUpper.includes('SISTEMAS HISTÓRICOS') || sUpper.includes('SISTEMAS HISTORICOS') || sUpper.includes('VONPAR')) {
+    grupo = 'Sistemas Históricos';
+  }
+
+  return { sistema_name: sys, sistema_grupo: grupo, sid: sid || 'PRD' };
+}
+
 app.post('/api/rfcs/bulk-upload', authenticateToken, requireAuth, async (req, res) => {
   try {
     const { rfcs } = req.body;
@@ -1674,62 +1961,90 @@ app.post('/api/rfcs/bulk-upload', authenticateToken, requireAuth, async (req, re
       return res.status(400).json({ error: 'Se requiere un arreglo "rfcs" no vacío.' });
     }
 
-    // ID de TQS Carlos Andrés Castillo Barajas
-    const carlosRes = await pool.query("SELECT id FROM public.tqs_users WHERE email = 'andres.castillo@easconsulting.com.mx' OR nombre ILIKE '%Castillo%' LIMIT 1");
-    const carlosId = carlosRes.rows[0]?.id || '00000000-0000-0000-0000-000000000005';
-    
-    // Propietario destino
-    const targetOwnerId = (req.user?.sub && req.user.sub !== '00000000-0000-0000-0000-000000000001') ? req.user.sub : carlosId;
+    // Mapeo dinámico de sistemas a owner_id en base de datos
+    const sysOwnersRes = await pool.query("SELECT nombre, owner_id FROM public.sistemas WHERE owner_id IS NOT NULL");
+    const sysOwnerMap = {};
+    for (const row of sysOwnersRes.rows) {
+      sysOwnerMap[row.nombre.toLowerCase().trim().replace(/^sap\s+/, '')] = row.owner_id;
+    }
+
+    // Default owner
+    const defaultOwnerId = req.user?.sub || '00000000-0000-0000-0000-000000000005';
 
     let processedCount = 0;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       for (const r of rfcs) {
-        const ticket = (r.ticket || '').trim() || `RFC-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        const ticket = (r.ticket || '').trim() || `RFC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         const tipo = r.tipo || 'RFC';
-        const ambiente = r.ambiente || 'Azure';
-        const sid = r.sid || 'PRD';
+        const rawAmb = (r.ambiente || '').trim();
+        const rawInfra = (r.infraestructura || '').trim();
+        let infraestructura = rawInfra || (rawAmb.toLowerCase().includes('premise') ? 'On Premise' : 'Azure');
+        let ambiente = (rawAmb && !rawAmb.toLowerCase().includes('azure') && !rawAmb.toLowerCase().includes('premise')) ? rawAmb : (r.sid || 'PRD');
+        const sid = r.sid || ambiente || 'PRD';
         const fecha = r.fecha || new Date().toISOString().split('T')[0];
         const fecha_fin = r.fecha_fin || r.fecha;
         const fecha_fin_retorno = r.fecha_fin_retorno || null;
-        const hora_inicio = r.hora_inicio || '00:00';
-        const hora_fin = r.hora_fin || '23:59';
-        const hora_fin_retorno = r.hora_fin_retorno || null;
-        const sistema_name = r.sistema_name || r.sistema || 'SAP General';
-        const promotor = r.promotor || 'Carga Inicial';
-        const coordinador_kof = r.coordinador_kof || null;
-        const descripcion = r.descripcion || 'RFC cargado en Carga Inicial';
+        const hora_inicio = normalizeTimeString(r.hora_inicio) || '00:00';
+        const hora_fin = normalizeTimeString(r.hora_fin) || '23:59';
+        const hora_fin_retorno = normalizeTimeString(r.hora_fin_retorno) || null;
+        const rawSys = (r.sistema_name || r.sistema || 'SAP General').trim();
+        const normalized = normalizeSystemAndGroup(rawSys, r.sid || rawAmb);
+        const sistema_name = normalized.sistema_name;
+        const sistema_grupo = normalized.sistema_grupo;
+        if (!r.sid && normalized.sid) sid = normalized.sid;
+
+        let promotor = r.promotor || 'Carga Inicial';
+        let coordinador_kof = r.coordinador_kof || null;
+
+        // Resolver owner segun sistema_grupo oficial del RFC
+        const groupKey = sistema_grupo.toLowerCase().trim();
+        const sysKey = sistema_name.toLowerCase().trim();
+        let resolvedOwner = sysOwnerMap[groupKey] || sysOwnerMap[sysKey] || null;
+        if (!resolvedOwner) {
+          for (const [k, oid] of Object.entries(sysOwnerMap)) {
+            if (groupKey.includes(k) || k.includes(groupKey) || sysKey.includes(k) || k.includes(sysKey)) {
+              resolvedOwner = oid;
+              break;
+            }
+          }
+        }
+        const owner_id = r.owner_id || resolvedOwner || defaultOwnerId;
+        const tqs_ids = [owner_id];
+
+        const descripcion = (r.descripcion && r.descripcion.trim() !== '') ? r.descripcion : (r.observaciones || `${ticket} - ${sistema_name}`);
         const observaciones = r.observaciones || '';
         const status = r.status || 'Finalizado con éxito';
-        const owner_id = r.owner_id || targetOwnerId;
 
         await client.query(`
           INSERT INTO public.rfcs (
-            ticket, tipo, ambiente, sid, fecha, fecha_fin, fecha_fin_retorno,
-            hora_inicio, hora_fin, hora_fin_retorno, sistema_name, promotor,
-            coordinador_kof, descripcion, observaciones, status, owner_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-          ON CONFLICT (ticket, sistema_name) DO UPDATE SET
+            ticket, tipo, ambiente, infraestructura, sid, fecha, fecha_fin, fecha_fin_retorno,
+            hora_inicio, hora_fin, hora_fin_retorno, sistema_name, sistema_grupo, promotor,
+            coordinador_kof, descripcion, observaciones, status, owner_id, tqs_ids
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+          ON CONFLICT (ticket, sistema_name, fecha) DO UPDATE SET
             tipo = EXCLUDED.tipo,
             ambiente = EXCLUDED.ambiente,
+            infraestructura = EXCLUDED.infraestructura,
             sid = EXCLUDED.sid,
-            fecha = EXCLUDED.fecha,
             fecha_fin = EXCLUDED.fecha_fin,
             fecha_fin_retorno = EXCLUDED.fecha_fin_retorno,
             hora_inicio = EXCLUDED.hora_inicio,
             hora_fin = EXCLUDED.hora_fin,
             hora_fin_retorno = EXCLUDED.hora_fin_retorno,
+            sistema_grupo = EXCLUDED.sistema_grupo,
             promotor = EXCLUDED.promotor,
             coordinador_kof = EXCLUDED.coordinador_kof,
             descripcion = EXCLUDED.descripcion,
             observaciones = EXCLUDED.observaciones,
             status = EXCLUDED.status,
             owner_id = EXCLUDED.owner_id,
+            tqs_ids = EXCLUDED.tqs_ids,
             deleted_at = NULL,
             updated_at = NOW()
-        `, [ticket, tipo, ambiente, sid, fecha, fecha_fin, fecha_fin_retorno, hora_inicio, hora_fin, hora_fin_retorno, sistema_name, promotor, coordinador_kof, descripcion, observaciones, status, owner_id]);
-        
+        `, [ticket, tipo, ambiente, infraestructura, sid, fecha, fecha_fin, fecha_fin_retorno, hora_inicio, hora_fin, hora_fin_retorno, sistema_name, sistema_grupo, promotor, coordinador_kof, descripcion, observaciones, status, owner_id, tqs_ids]);
+
         processedCount++;
       }
       await client.query('COMMIT');
@@ -1746,14 +2061,88 @@ app.post('/api/rfcs/bulk-upload', authenticateToken, requireAuth, async (req, re
       'rfcs',
       'BULK',
       'CREATE',
-      `Carga Inicial Masiva de ${processedCount} RFCs vinculados a TQS Leader`,
-      { total: processedCount, targetOwnerId }
+      `Carga Inicial Masiva de ${processedCount} RFCs con resolución de TQS`,
+      { total: processedCount }
     );
 
     res.status(200).json({ success: true, count: processedCount });
   } catch (err) {
     logApp('ERROR', 'BULK_UPLOAD', 'Error en /api/rfcs/bulk-upload', err.stack);
     res.status(400).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// VISTAS PERSONALIZADAS TQS: MIS SISTEMAS & BACKUP / MIS RFCS PROMOVIDOS
+// ============================================================
+
+app.get('/api/rfcs/user-backup-view', authenticateToken, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) return res.status(401).json({ error: 'Usuario no autenticado' });
+
+    const userRes = await pool.query('SELECT nombre, rol, sistemas FROM public.tqs_users WHERE id = $1', [userId]);
+    const userRow = userRes.rows[0] || {};
+    const userSysArr = Array.isArray(userRow.sistemas) ? userRow.sistemas : [];
+
+    const sysRes = await pool.query('SELECT nombre FROM public.sistemas WHERE owner_id = $1 OR backup_id = $1', [userId]);
+    const sysNamesFromDb = sysRes.rows.map(r => r.nombre);
+
+    const allSysNames = [...new Set([...userSysArr, ...sysNamesFromDb])].map(s => String(s).trim()).filter(Boolean);
+
+    let queryStr = `
+      SELECT r.* 
+      FROM public.rfcs r
+      WHERE r.deleted_at IS NULL
+    `;
+    const params = [];
+
+    if (allSysNames.length > 0) {
+      params.push(allSysNames);
+      params.push(userId);
+      queryStr += ` AND (r.sistema_name = ANY($1) OR r.sistema_grupo = ANY($1) OR r.owner_id = $2 OR $2 = ANY(r.tqs_ids))`;
+    } else {
+      params.push(userId);
+      queryStr += ` AND (r.owner_id = $1 OR $1 = ANY(r.tqs_ids))`;
+    }
+
+    queryStr += ` ORDER BY r.fecha DESC, r.hora_inicio DESC LIMIT 2000`;
+
+    const result = await pool.query(queryStr, params);
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    logApp('ERROR', 'USER_BACKUP_VIEW', 'Error en /api/rfcs/user-backup-view', err.stack);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/rfcs/promoter-view', authenticateToken, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user?.sub;
+    const userEmail = req.user?.email || '';
+    if (!userId) return res.status(401).json({ error: 'Usuario no autenticado' });
+
+    const userRes = await pool.query('SELECT nombre, email FROM public.tqs_users WHERE id = $1', [userId]);
+    const userName = userRes.rows[0]?.nombre || '';
+
+    const params = [userId, `%${userName}%`, `%${userEmail}%`];
+    const queryStr = `
+      SELECT r.* 
+      FROM public.rfcs r
+      WHERE r.deleted_at IS NULL
+        AND (
+          r.owner_id = $1
+          OR ($2 != '%%' AND r.promotor ILIKE $2)
+          OR ($3 != '%%' AND r.promotor ILIKE $3)
+        )
+      ORDER BY r.fecha DESC, r.hora_inicio DESC LIMIT 2000
+    `;
+
+    const result = await pool.query(queryStr, params);
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    logApp('ERROR', 'PROMOTER_VIEW', 'Error en /api/rfcs/promoter-view', err.stack);
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -1791,7 +2180,7 @@ Debes responder UNICAMENTE con un objeto JSON válido con la siguiente estructur
   "observaciones": "Notas adicionales, riesgos o plan de rollback si se menciona"
 }`;
 
-const controller = new AbortController();
+    const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     const apiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1826,10 +2215,117 @@ const controller = new AbortController();
   }
 });
 
+async function sendTeamsNotification({ modulo = 'Alertas', titulo, title, detalles, message, rfcTicket, sistema, responsable, estatus }) {
+  const teamsWebhookUrl = process.env.TEAMS_WEBHOOK_URL || 'https://default93f33571550f43cfb09fcd331338d0.86.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/532ac7aa3fc3448e91832de84ce5d11d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=oOcV6iS6dJiOO9VhjvaC7IQFCz8Yq0uWwcUQWbyjp3U';
+
+  const finalTitle = titulo || title || 'Operaciones SAP';
+  const finalContent = detalles || message || 'Notificación automática emitida por ATLAS SAP Operations Suite';
+
+  const sectionObj = {
+    "activityTitle": `Notificación ATLAS — ${modulo}`,
+    "activitySubtitle": finalTitle,
+    "markdown": true,
+    "text": finalContent
+  };
+
+  if (rfcTicket || sistema || responsable) {
+    sectionObj.facts = [
+      { "name": "Ticket / ID:", "value": String(rfcTicket || '—') },
+      { "name": "Sistema:", "value": String(sistema || 'SAP General') },
+      { "name": "Responsable TQS:", "value": String(responsable || 'Sin asignar') },
+      { "name": "Estado:", "value": String(estatus || 'Pendiente') },
+      { "name": "Fecha / Hora CDMX:", "value": new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }) }
+    ];
+  }
+
+  const payload = {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "themeColor": (modulo === 'Alertas' || modulo.includes('ALERTA')) ? "FF5555" : "0076D7",
+    "summary": `Notificación ATLAS [${modulo}]: ${finalTitle}`,
+    "sections": [sectionObj]
+  };
+
+  try {
+    if (teamsWebhookUrl.startsWith('http://') || teamsWebhookUrl.startsWith('https://')) {
+      const resp = await fetch(teamsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return resp.ok;
+    }
+  } catch (e) {
+    console.warn('[TEAMS_WEBHOOK_ERROR]', e.message);
+    return false;
+  }
+}
+
+app.post('/api/notifications/teams', authenticateToken, requireAuth, async (req, res) => {
+  const { modulo = 'Alertas', titulo = 'Notificación Operativa', detalles, rfcTicket, sistema, responsable, estatus } = req.body;
+  await sendTeamsNotification({ modulo, titulo, detalles, rfcTicket, sistema, responsable, estatus });
+  return res.json({ ok: true, message: 'Notificación enviada exitosamente a MS Teams' });
+});
+
+app.get('/api/rfcs/promoter-view', authenticateToken, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.sub;
+    const userEmail = req.user.email || '';
+    let userName = '';
+
+    const userRes = await pool.query(
+      'SELECT nombre FROM public.tqs_users WHERE id = $1 OR LOWER(email) = LOWER($2) LIMIT 1',
+      [userId, userEmail]
+    );
+    if (userRes.rows.length > 0 && userRes.rows[0].nombre) {
+      userName = userRes.rows[0].nombre.trim();
+    } else {
+      const authRes = await pool.query(
+        'SELECT raw_user_meta_data FROM public.auth_users WHERE id = $1 LIMIT 1',
+        [userId]
+      );
+      userName = authRes.rows[0]?.raw_user_meta_data?.nombre || '';
+    }
+
+    const emailPrefix = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+    const params = [userId];
+    let orConditions = ['owner_id = $1'];
+
+    if (userEmail) {
+      params.push(`%${userEmail}%`);
+      orConditions.push(`promotor ILIKE $${params.length}`);
+    }
+    if (userName && userName.length >= 3) {
+      params.push(`%${userName}%`);
+      orConditions.push(`promotor ILIKE $${params.length}`);
+      const nameParts = userName.split(/\s+/).filter(p => p.length >= 3);
+      for (const part of nameParts) {
+        params.push(`%${part}%`);
+        orConditions.push(`promotor ILIKE $${params.length}`);
+      }
+    }
+    if (emailPrefix && emailPrefix.length >= 3) {
+      params.push(`%${emailPrefix}%`);
+      orConditions.push(`promotor ILIKE $${params.length}`);
+    }
+
+    const sql = `
+      SELECT * FROM public.rfcs 
+      WHERE deleted_at IS NULL AND (${orConditions.join(' OR ')})
+      ORDER BY created_at DESC
+    `;
+    const result = await pool.query(sql, params);
+    return res.json(result.rows);
+  } catch (err) {
+    logger.error({ err: err.message }, 'PROMOTER_VIEW_ERROR');
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
   try {
     let { messages, prompt, provider = 'gemini', model } = req.body;
-    
+
     const userQuery = prompt || (Array.isArray(messages) && messages.length > 0 ? (messages[messages.length - 1].content || messages[messages.length - 1].text) : '') || '';
     if (!userQuery) {
       return res.status(400).json({ error: 'Se requiere un parámetro "prompt" o un arreglo "messages".' });
@@ -1840,30 +2336,50 @@ app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
     }
 
     const qLower = userQuery.toLowerCase().trim();
+    const qNorm = userQuery.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-    let statsRes = { total_rfcs: 0, aprobados: 0, pendientes: 0, fallidos: 0, prd_count: 0, qas_count: 0, dev_count: 0 };
+    let statsRes = { total_rfcs: 0, aprobados: 0, por_ejecutar: 0, rezagados: 0, pendientes: 0, fallidos: 0, prd_count: 0, qas_count: 0, dev_count: 0 };
     let solStatsRes = { total_sols: 0, aprobadas: 0, en_proceso: 0, en_espera: 0, cerradas: 0, canceladas: 0 };
     let rfcsList = [];
+    let upcomingRfcsList = [];
     let sistemasList = [];
     let solicitudesList = [];
     let usersList = [];
     let topRfcsBySystem = [];
     let topSolsBySystem = [];
+    let tqsBreakdownList = [];
 
     try {
       const statsQuery = await pool.query(`
         SELECT 
           COUNT(*) as total_rfcs,
-          COUNT(*) FILTER (WHERE status ILIKE '%aprobado%' OR status ILIKE '%completado%' OR status ILIKE '%éxito%') as aprobados,
-          COUNT(*) FILTER (WHERE status ILIKE '%espera%' OR status ILIKE '%pendiente%' OR status ILIKE '%curso%' OR status ILIKE '%vobo%') as pendientes,
+          COUNT(*) FILTER (WHERE status ILIKE '%éxito%' AND status NOT ILIKE '%sin%') as aprobados,
+          COUNT(*) FILTER (WHERE (status ILIKE '%espera%' OR status ILIKE '%vobo%' OR status ILIKE '%aprobado%') AND fecha >= CURRENT_DATE) as por_ejecutar,
+          COUNT(*) FILTER (WHERE (status ILIKE '%espera%' OR status ILIKE '%vobo%') AND fecha < CURRENT_DATE) as rezagados,
           COUNT(*) FILTER (WHERE status ILIKE '%sin éxito%' OR status ILIKE '%rechazado%' OR status ILIKE '%cancelado%') as fallidos,
           COUNT(*) FILTER (WHERE ambiente = 'PRD') as prd_count,
           COUNT(*) FILTER (WHERE ambiente = 'QAS') as qas_count,
+          COUNT(*) FILTER (WHERE ambiente = 'PPRD') as pprd_count,
           COUNT(*) FILTER (WHERE ambiente = 'DEV') as dev_count
         FROM public.rfcs
       `);
-      if (statsQuery.rows[0]) statsRes = statsQuery.rows[0];
+      if (statsQuery.rows[0]) {
+        statsRes = statsQuery.rows[0];
+        statsRes.pendientes = (parseInt(statsRes.por_ejecutar || 0, 10) + parseInt(statsRes.rezagados || 0, 10));
+      }
+    } catch (eStats) { logger.warn({ err: eStats.message }, 'AI_STATS_ERR'); }
 
+    try {
+      const upcomingRfcsQuery = await pool.query(`
+        SELECT ticket, fecha, COALESCE(sistema_name, sistema_grupo) as sistema, status, promotor, descripcion 
+        FROM public.rfcs 
+        WHERE status NOT IN ('Finalizado con éxito', 'Cancelado') AND fecha >= CURRENT_DATE 
+        ORDER BY fecha ASC LIMIT 15
+      `);
+      upcomingRfcsList = upcomingRfcsQuery.rows || [];
+    } catch (eUp) { logger.warn({ err: eUp.message }, 'AI_UPCOMING_ERR'); }
+
+    try {
       const solStatsQuery = await pool.query(`
         SELECT 
           COUNT(*) as total_sols,
@@ -1875,13 +2391,17 @@ app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
         FROM public.solicitudes
       `);
       if (solStatsQuery.rows[0]) solStatsRes = solStatsQuery.rows[0];
+    } catch (eSolStats) { logger.warn({ err: eSolStats.message }, 'AI_SOLSTATS_ERR'); }
 
+    try {
       const rfcsQuery = await pool.query(`
         SELECT ticket, tipo, ambiente, fecha, fecha_fin, fecha_fin_retorno, sistema_name, promotor, status, descripcion
-        FROM public.rfcs ORDER BY created_at DESC LIMIT 50
+        FROM public.rfcs ORDER BY created_at DESC LIMIT 100
       `);
       rfcsList = rfcsQuery.rows;
+    } catch (eRfcs) { logger.warn({ err: eRfcs.message }, 'AI_RFCS_ERR'); }
 
+    try {
       const sistemasQuery = await pool.query(`
         SELECT 
           s.id, s.nombre, s.infraestructura, s.tipo_sap, s.criticidad, s.owner_id, s.backup_id,
@@ -1893,16 +2413,22 @@ app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
         ORDER BY s.nombre ASC
       `);
       sistemasList = sistemasQuery.rows;
+    } catch (eSys) { logger.warn({ err: eSys.message }, 'AI_SYS_ERR'); }
 
+    try {
       const solQuery = await pool.query(`
-        SELECT ticket, id, tipo, origen, fecha_inicio, sistema_sap, responsable, estatus, descripcion, titulo 
-        FROM public.solicitudes ORDER BY created_at DESC LIMIT 50
+        SELECT id, tipo, origen, fecha_inicio, sistema_sap, responsable, estatus, created_at 
+        FROM public.solicitudes ORDER BY created_at DESC LIMIT 100
       `);
       solicitudesList = solQuery.rows;
+    } catch (eSol) { logger.warn({ err: eSol.message }, 'AI_SOL_ERR'); }
 
+    try {
       const usersQuery = await pool.query('SELECT id, nombre, email, rol, sistemas FROM public.tqs_users WHERE activo = true ORDER BY nombre ASC');
       usersList = usersQuery.rows;
+    } catch (eUsers) { logger.warn({ err: eUsers.message }, 'AI_USERS_ERR'); }
 
+    try {
       const rfcRankQuery = await pool.query(`
         SELECT sistema_name, COUNT(*) as rfc_count 
         FROM public.rfcs 
@@ -1912,7 +2438,9 @@ app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
         LIMIT 10
       `);
       topRfcsBySystem = rfcRankQuery.rows;
+    } catch (eRank) { logger.warn({ err: eRank.message }, 'AI_RFCRANK_ERR'); }
 
+    try {
       const solRankQuery = await pool.query(`
         SELECT COALESCE(sistema_sap, 'General') as sistema_name, COUNT(*) as sol_count 
         FROM public.solicitudes 
@@ -1922,9 +2450,18 @@ app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
         LIMIT 10
       `);
       topSolsBySystem = solRankQuery.rows;
-    } catch(eCtx) {
-      logger.error({ err: eCtx.message, stack: eCtx.stack }, 'AI_CONTEXT_QUERY_ERROR');
-    }
+    } catch (eSolRank) { logger.warn({ err: eSolRank.message }, 'AI_SOLRANK_ERR'); }
+
+    try {
+      const tqsBrkQuery = await pool.query(`
+        SELECT COALESCE(u.nombre, 'Sin Asignar') as lider, COUNT(r.id) as rfc_count
+        FROM public.rfcs r
+        LEFT JOIN public.tqs_users u ON r.owner_id = u.id
+        GROUP BY u.nombre
+        ORDER BY rfc_count DESC
+      `);
+      tqsBreakdownList = tqsBrkQuery.rows;
+    } catch (eTqsBrk) { logger.warn({ err: eTqsBrk.message }, 'AI_TQSBRK_ERR'); }
 
     let learnedKbText = '';
     try {
@@ -1938,44 +2475,56 @@ app.post('/api/ai/chat', authenticateToken, requireAuth, async (req, res) => {
         learnedKbText = `\n\nCONOCIMIENTO Y REGLAS DE NEGOCIO APRENDIDAS AUTÓNOMAMENTE DE RETROALIMENTACIÓN:\n` +
           kbRes.rows.map(r => `• Tema: ${r.pregunta}\n  Respuesta Validada: ${r.respuesta}`).join('\n');
       }
-    } catch (eKb) {}
+    } catch (eKb) { }
 
-    const systemInstruction = `Eres "Atlas IA Copilot", el asistente virtual agéntico especializado en Operaciones, Gobernanza e Infraestructura SAP de ATLAS (EAS Consulting).
+    const systemInstruction = `Eres Atlas IA Copilot.
+
+PERFIL Y ROL:
+Actúa como un Gerente Senior de Operaciones SAP y Gestión de Cambios (EAS Consulting).
+Tus respuestas deben ser:
+- Precisas.
+- Basadas exclusivamente en datos reales de la plataforma ATLAS (0% inventar o asumir información).
+- Ejecutivas.
+- Orientadas a gestión.
+- Orientadas a toma de decisiones.
+
+Evita textos largos. Evita explicaciones académicas.
+
+FRAMEWORK DE RAZONAMIENTO DE 5 PASOS:
+PASO 1: Determina la intención del usuario.
+PASO 2: Determina qué entidad consulta (RFC, Solicitud, KIT, Sistema, Métrica, Usuario, Responsable, Aplicación).
+PASO 3: Determina los filtros implícitos (Prioridad, Estado, Fecha, Sistema, Infraestructura).
+PASO 4: Utiliza los resultados obtenidos en las consultas reales a la base de datos.
+PASO 5: Responde exactamente lo solicitado (lista, conteo o resumen ejecutivo).
+
+REGLAS DE RESULTADOS OPERATIVOS:
+- Para consultas operativas mostrar siempre: Identificador (Ticket/ID), Sistema, Estado, Prioridad/Tipo, Responsable, Fecha.
+- Mostrar máximo 10 resultados por consulta.
+- Si no existen coincidencias responder exactamente: "No se encontraron resultados que coincidan con la consulta."
+
+FORMATO OBLIGATORIO DE RESPUESTA:
+
+RESUMEN
+
+HALLAZGOS
+
+RIESGOS
+
+RECOMENDACIÓN
 
 CONTEXTO DEL USUARIO EN SESIÓN:
 • Usuario Activo: ${req.user ? req.user.nombre : 'Usuario General'} (${req.user ? req.user.email : ''})
 • Rol en Plataforma: ${req.user ? req.user.rol : 'tqs_leader'}
 
-ESTILO Y TONO DE COMUNICACIÓN:
-• Comunicación natural, humana, empática, clara y ejecutiva (evita lenguaje acartonado, frío o robótico).
-• Dirígete al usuario de manera cercana pero profesional, demostrando dominio operativo experto en SAP.
-• Proporciona respuestas bien estructuradas con formato Markdown limpio, encabezados claros (##), listas con viñetas (•) y tablas cuando sea conveniente.
-• Si el usuario solicita datos numéricos o métricas, entrega cifras exactas respaldadas por la telemetría en tiempo real.
-• Ofrece recomendaciones prácticas u orientaciones útiles ("Tips de Operación") para facilitar las tareas del equipo.
-
-CAPACIDADES AGÉNTICAS Y ACCIONES DIRECTAS EN LA INTERFAZ:
-Puedes ejecutar acciones directas en la pantalla del usuario incluyendo los siguientes comandos especiales al final de tu respuesta:
-• Navegación a módulos: [[ACTION:NAVIGATE|<page_id>|<texto_botón>]]
-  (Páginas válidas: sheet [Tablero RFCs], solicitudes, alertas, vobo, usuarios, sistemas, auditoria, nuevo [Nuevo RFC], nueva-solicitud [Nueva Solicitud])
-• Apertura de Modales: [[ACTION:MODAL|<modal_id>|<texto_botón>]]
-  (Modales válidos: new-rfc [Crear RFC], new-solicitude [Crear Solicitud], new-user [Nuevo Usuario], new-sistema [Nuevo Sistema])
-• Filtrado de Datos: [[ACTION:FILTER|<valor_filtro>|<texto_botón>]]
-  (Ejemplos: [[ACTION:FILTER|PRD|Ver Cambios PRD]], [[ACTION:FILTER|Incidente|Ver Incidentes]])
-
-REGLA AGÉNTICA: Cuando el usuario exprese la intención de consultar, crear o filtrar registros, adjunta SIEMPRE los botones de acción agéntica [[ACTION:...]] correspondientes para permitir la ejecución en un solo clic.
-
 TELEMETRÍA Y DATOS EN TIEMPO REAL:
-• RFCs Totales: ${statsRes.total_rfcs} (Exitosos: ${statsRes.aprobados}, En Espera/VOBO: ${statsRes.pendientes}, Fallidos: ${statsRes.fallidos})
-• Distribución por Ambiente: Producción PRD (${statsRes.prd_count}), Calidad QAS (${statsRes.qas_count}), Desarrollo DEV (${statsRes.dev_count})
+• FECHA HOY (CDMX): ${new Date().toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' })}
+• RFCs Totales Registrados: ${statsRes.total_rfcs} (Finalizados con Éxito: ${statsRes.aprobados}, Próximos Por Ejecutar [Fecha >= Hoy]: ${statsRes.por_ejecutar || 0}, Rezagados Pendientes de Estatus [Fecha < Hoy]: ${statsRes.rezagados || 0}, Cancelados/Fallidos: ${statsRes.fallidos})
 • Solicitudes Operativas: ${solStatsRes.total_sols} (Aprobadas: ${solStatsRes.aprobadas}, En Proceso: ${solStatsRes.en_proceso}, En Espera: ${solStatsRes.en_espera}, Cerradas: ${solStatsRes.cerradas})
 • Catálogo de Sistemas (${sistemasList.length}): ${sistemasList.map(s => `${s.nombre} [${s.tipo_sap}]`).join(', ')}
 • Equipo Responsable TQS (${usersList.length} especialistas): ${usersList.map(u => `${u.nombre} (${u.rol})`).join(', ')}
 
-RANKING REAL DE SISTEMAS CON MÁS RFCS:
-${topRfcsBySystem.length > 0 ? topRfcsBySystem.map((r, i) => `${i+1}. ${r.sistema_name}: ${r.rfc_count} RFCs`).join('\n') : 'Sin registros'}
-
-RANKING REAL DE SISTEMAS CON MÁS SOLICITUDES:
-${topSolsBySystem.length > 0 ? topSolsBySystem.map((s, i) => `${i+1}. ${s.sistema_name}: ${s.sol_count} Solicitudes`).join('\n') : 'Sin registros'}
+RFCS PRÓXIMOS A EJECUTARSE (FECHA FUTURA O EN FECHA):
+${JSON.stringify(upcomingRfcsList, null, 2)}
 
 ÚLTIMAS SOLICITUDES EN SISTEMA:
 ${JSON.stringify(solicitudesList.slice(0, 10), null, 2)}
@@ -1989,13 +2538,18 @@ ${JSON.stringify(rfcsList.slice(0, 10), null, 2)}${learnedKbText}`;
 
     if (provider === 'gemini' && geminiApiKey) {
       try {
-        const selectedModel = model || 'gemini-1.5-flash';
+        let selectedModel = 'gemini-1.5-flash';
+        if (model && (model.includes('1.5-pro') || model.includes('pro'))) {
+          selectedModel = 'gemini-1.5-pro';
+        } else if (model && (model.includes('2.0') || model.includes('exp'))) {
+          selectedModel = 'gemini-2.0-flash-exp';
+        }
         const geminiContents = messages.map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
           parts: [{ text: m.content || m.text || '' }]
         }));
 
-const geminiController = new AbortController();
+        const geminiController = new AbortController();
         const geminiTimeoutId = setTimeout(() => geminiController.abort(), 30000);
         let geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${geminiApiKey}`, {
           method: 'POST',
@@ -2019,7 +2573,7 @@ const geminiController = new AbortController();
     } else if (provider === 'anthropic' && anthropicApiKey) {
       try {
         const selectedModel = model || 'claude-3-5-sonnet-20241022';
-const anthropicController = new AbortController();
+        const anthropicController = new AbortController();
         const anthropicTimeoutId = setTimeout(() => anthropicController.abort(), 30000);
         const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -2045,7 +2599,7 @@ const anthropicController = new AbortController();
       } catch (eAnt) {
         console.warn('[AI_ANTHROPIC_FALLBACK]', eAnt.message);
       }
-} else if (provider === 'openai' && openAiApiKey) {
+    } else if (provider === 'openai' && openAiApiKey) {
       try {
         const selectedModel = model || 'gpt-4o-mini';
         const openAiController = new AbortController();
@@ -2073,162 +2627,285 @@ const anthropicController = new AbortController();
 
     let replyText = '';
 
-    const ticketMatch = userQuery.match(/(?:RFC|SOL|INC|REQ|KIT|RCA|CHG|TICKET)[\w\-]+/i);
-    if (ticketMatch) {
-      const searchCode = ticketMatch[0].toUpperCase();
-      const rfcFound = rfcsList.find(r => (r.ticket || '').toUpperCase().includes(searchCode));
-      const solFound = solicitudesList.find(s => (s.ticket || s.id || '').toString().toUpperCase().includes(searchCode));
+    // 0. Saludo y Capacidades
+    if (qNorm === 'hola' || qNorm.startsWith('hola ') || qNorm.includes('buenos dias') || qNorm.includes('buenas tardes') || qNorm.includes('buenas noches') || qNorm === 'ayuda' || qNorm.includes('que puedes hacer') || qNorm.includes('que sabes hacer')) {
+      replyText = `**Atlas IA Copilot — Asistente de Operaciones SAP**\n\n` +
+        `Asistente operativo de la plataforma ATLAS listo para gestión, monitoreo y soporte a decisiones.\n\n` +
+        `**Telemetría operativa en tiempo real:**\n` +
+        `• **RFCs Monitoreados:** **${statsRes.total_rfcs}** registros en PostgreSQL (${statsRes.aprobados} exitosos, ${statsRes.pendientes} pendientes de cierre).\n` +
+        `• **Catálogo de Sistemas:** **${sistemasList.length}** sistemas registrados.\n` +
+        `• **Líderes TQS Activos:** **${usersList.length}** especialistas asignados.\n\n` +
+        `**Consultas frecuentes disponibles:**\n` +
+        `• *"¿Cuántos RFCs hay registrados y cuál es su desglose?"*\n` +
+        `• *"¿Qué sistema tiene más RFCs?"*\n` +
+        `• *"¿Cuáles son los RFCs pendientes de aprobación?"*\n` +
+        `• *"¿Cuántos sistemas tiene cada líder TQS?"*\n` +
+        `• *"Resumen ejecutivo de operaciones"*`;
+      replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]] [[ACTION:NAVIGATE|sistemas|Catálogo de Sistemas]]';
+    }
 
-      if (rfcFound) {
-        replyText = `🤖 **Atlas IA Copilot — Ficha de Ticket RFC**\n\n` +
-          `### 📄 Ticket RFC: \`${rfcFound.ticket}\`\n` +
-          `• **Tipo de Cambio:** ${rfcFound.tipo || 'N/A'}\n` +
-          `• **Ambiente:** \`${rfcFound.ambiente || 'PRD'}\`\n` +
-          `• **Sistema Afectado:** **${rfcFound.sistema_name || 'SAP General'}**\n` +
-          `• **Estatus Actual:** \`${rfcFound.status}\`\n` +
-          `• **Promotor / TQS Leader:** ${rfcFound.promotor || 'Sin asignar'}\n` +
-          `• **Fecha Inicio:** ${rfcFound.fecha || 'N/A'} | **Retorno:** ${rfcFound.fecha_fin_retorno || 'N/A'}\n` +
-          `• **Descripción:** ${rfcFound.descripcion || 'Sin descripción adicional'}`;
-      } else if (solFound) {
-        replyText = `🤖 **Atlas IA Copilot — Ficha de Solicitud Operativa**\n\n` +
-          `### 📋 Solicitud: \`${solFound.ticket || solFound.id}\`\n` +
-          `• **Tipo de Solicitud:** **${solFound.tipo}**\n` +
-          `• **Origen:** ${solFound.origen || 'DXC'}\n` +
-          `• **Sistema SAP:** ${solFound.sistema_sap || solFound.sistema || 'General'}\n` +
-          `• **Estatus Actual:** \`${solFound.estatus || solFound.estado || 'En proceso'}\`\n` +
-          `• **Responsable Asignado:** ${solFound.responsable || 'No asignado'}\n` +
-          `• **Fecha Registro:** ${solFound.fecha_inicio || 'N/A'}\n` +
-          `• **Detalle:** ${solFound.descripcion || solFound.titulo || 'Sin descripción'}`;
+    // 1. Ficha directa de Ticket (RFC / SOL / CHG / INC)
+    if (!replyText) {
+      const ticketMatch = userQuery.match(/(?:RFC|SOL|INC|REQ|KIT|RCA|CHG|TICKET)[\w\-]+/i);
+      if (ticketMatch) {
+        const searchCode = ticketMatch[0].toUpperCase();
+        const rfcFound = rfcsList.find(r => (r.ticket || '').toUpperCase().includes(searchCode));
+        const solFound = solicitudesList.find(s => (s.id || '').toString().toUpperCase().includes(searchCode));
+
+        if (rfcFound) {
+          replyText = `**Atlas IA Copilot — Ficha de Ticket RFC**\n\n` +
+            `### Ticket RFC: \`${rfcFound.ticket}\`\n` +
+            `• **Tipo de Cambio:** ${rfcFound.tipo || 'N/A'}\n` +
+            `• **Ambiente:** \`${rfcFound.ambiente || 'PRD'}\`\n` +
+            `• **Sistema Afectado:** **${rfcFound.sistema_name || 'SAP General'}**\n` +
+            `• **Estatus Actual:** \`${rfcFound.status}\`\n` +
+            `• **Promotor / TQS Leader:** ${rfcFound.promotor || 'Sin asignar'}\n` +
+            `• **Fecha Inicio:** ${rfcFound.fecha || 'N/A'} | **Retorno:** ${rfcFound.fecha_fin_retorno || 'N/A'}\n` +
+            `• **Descripción:** ${rfcFound.descripcion || 'Sin descripción adicional'}`;
+          replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]]';
+        } else if (solFound) {
+          replyText = `**Atlas IA Copilot — Ficha de Solicitud Operativa**\n\n` +
+            `### Solicitud: \`${solFound.id}\`\n` +
+            `• **Tipo de Solicitud:** **${solFound.tipo}**\n` +
+            `• **Origen:** ${solFound.origen || 'EAS'}\n` +
+            `• **Sistema SAP:** ${solFound.sistema_sap || 'General'}\n` +
+            `• **Estatus Actual:** \`${solFound.estatus || 'En proceso'}\`\n` +
+            `• **Responsable Asignado:** ${solFound.responsable || 'No asignado'}\n` +
+            `• **Fecha Registro:** ${solFound.fecha_inicio || 'N/A'}`;
+          replyText += '\n\n[[ACTION:NAVIGATE|solicitudes|Ir a Solicitudes]]';
+        }
       }
     }
 
-    // Handler: "¿Qué sistema tiene más RFCs?", "sistemas con más cambios", "que sistema tiene mas", etc.
-    if (!replyText && (qLower.includes('mas rfc') || qLower.includes('más rfc') || qLower.includes('mayor rfc') || qLower.includes('que sistema tiene mas') || qLower.includes('cuál sistema tiene más') || qLower.includes('cual sistema tiene mas') || (qLower.includes('sistema') && (qLower.includes('mas') || qLower.includes('más')) && (qLower.includes('rfc') || qLower.includes('cambio'))))) {
+    // 2. Conteo total y desglose de RFCs
+    if (!replyText && ((qNorm.includes('cuanto') && qNorm.includes('rfc')) || (qNorm.includes('total') && qNorm.includes('rfc')) || qNorm.includes('desglose') || (qNorm.includes('estatus') && qNorm.includes('rfc')))) {
+      const pctExito = statsRes.total_rfcs > 0 ? ((parseInt(statsRes.aprobados, 10) / parseInt(statsRes.total_rfcs, 10)) * 100).toFixed(1) : 0;
+
+      const tqsRowsStr = tqsBreakdownList.length > 0
+        ? tqsBreakdownList.map(t => {
+          const pct = statsRes.total_rfcs > 0 ? ((parseInt(t.rfc_count, 10) / parseInt(statsRes.total_rfcs, 10)) * 100).toFixed(1) : 0;
+          return `• **${t.lider}**: **${t.rfc_count}** RFCs (${pct}%)`;
+        }).join('\n')
+        : '• _Sin desglose disponible._';
+
+      replyText = `**Atlas IA Copilot — Auditoría y Desglose de RFCs**\n\n` +
+        `En la base de datos PostgreSQL de ATLAS se encuentran registrados **${statsRes.total_rfcs} RFCs** en total.\n\n` +
+        `### Distribución por Estatus:\n` +
+        `• **Finalizados con Éxito:** **${statsRes.aprobados}** (${pctExito}%)\n` +
+        `• **Pendientes / Espera de VOBO:** **${statsRes.pendientes}**\n` +
+        `• **Cancelados / Fallidos:** **${statsRes.fallidos}**\n` +
+        `• **Ambientes:** PRD (${statsRes.prd_count}) · QAS (${statsRes.qas_count}) · DEV (${statsRes.dev_count})\n\n` +
+        `### Distribución por Líder TQS:\n` +
+        `${tqsRowsStr}\n\n` +
+        `*Nota de Integridad:* Las cifras se sincronizan directamente contra la base de datos en tiempo real sin límites de paginación.`;
+      replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]] [[ACTION:NAVIGATE|direccion|Dashboard Dirección]]';
+    }
+
+    // 3. RFCs Pendientes de Aprobación / Ejecución
+    if (!replyText && (qNorm.includes('pendiente') || qNorm.includes('aprobar') || qNorm.includes('vobo') || qNorm.includes('espera') || qNorm.includes('proximo') || qNorm.includes('por ejecutar'))) {
+      const pendingRes = await pool.query(`
+        SELECT ticket, fecha, COALESCE(sistema_name, sistema_grupo) as sistema, status, promotor, descripcion
+        FROM public.rfcs
+        WHERE status NOT IN ('Finalizado con éxito', 'Cancelado')
+        ORDER BY fecha ASC LIMIT 20
+      `);
+      const pList = pendingRes.rows || [];
+      const fmtDate = (d) => {
+        if (!d) return 'N/A';
+        try {
+          return new Date(d).toISOString().split('T')[0];
+        } catch (e) {
+          return String(d).split('T')[0];
+        }
+      };
+      const todayStr = new Date().toISOString().split('T')[0];
+      const futuros = pList.filter(r => fmtDate(r.fecha) >= todayStr);
+      const pasados = pList.filter(r => fmtDate(r.fecha) < todayStr);
+
+      replyText = `**Atlas IA Copilot — RFCs Pendientes de Aprobación / Ejecución**\n\n` +
+        `Se identificaron **${pList.length} RFCs en espera de cierre o VOBO** en la base de datos:\n\n` +
+        `### Próximos por Ejecutar (Fecha Vigente >= Hoy):\n` +
+        (futuros.length > 0
+          ? futuros.map(r => `• **${r.ticket}** | Fecha: **${fmtDate(r.fecha)}** | Sistema: **${r.sistema || 'SAP'}** | Promotor: ${r.promotor || 'N/A'} | Estatus: \`${r.status}\``).join('\n')
+          : '• _No hay RFCs futuros pendientes de ejecución en este momento._') +
+        `\n\n### Rezagados (Pendientes de confirmar cierre con fecha anterior a hoy):\n` +
+        (pasados.length > 0
+          ? pasados.map(r => `• **${r.ticket}** | Fecha: ${fmtDate(r.fecha)} | Sistema: ${r.sistema || 'SAP'} | Promotor: ${r.promotor || 'N/A'} | Estatus: \`${r.status}\``).join('\n')
+          : '• _No hay RFCs rezagados._') +
+        `\n\n**Recomendación Operativa:** Coordinar con los Líderes TQS la validación final y cierre de los cambios rezagados.`;
+      replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]] [[ACTION:MODAL|new-rfc|Crear RFC]]';
+    }
+
+    // 4. Ranking de Sistemas por Volumen de RFCs
+    if (!replyText && ((qNorm.includes('sistema') && qNorm.includes('mas') && (qNorm.includes('rfc') || qNorm.includes('cambio'))) || qNorm.includes('que sistema tiene mas') || qNorm.includes('cual sistema tiene mas') || qNorm.includes('mas rfc') || qNorm.includes('mayor rfc') || qNorm.includes('ranking'))) {
       const topSys = topRfcsBySystem.length > 0 ? topRfcsBySystem[0] : null;
 
-      replyText = `🤖 **Atlas IA Copilot — Ranking de Sistemas por Volumen de RFCs**\n\n` +
-        `El sistema con mayor concentración de cambios (RFCs) en la plataforma ATLAS es **${topSys ? topSys.sistema_name : 'SAP General'}** con un total de **${topSys ? topSys.rfc_count : 0} RFCs** registrados.\n\n` +
-        `### 🏆 Top Sistemas con Mayor Número de RFCs:\n\n` +
-        (topRfcsBySystem.length > 0 
+      replyText = `**Atlas IA Copilot — Ranking de Sistemas por Volumen de RFCs**\n\n` +
+        `El sistema con mayor concentración de cambios registrados en ATLAS es **${topSys ? topSys.sistema_name : 'SAP General'}** con un total de **${topSys ? topSys.rfc_count : 0} RFCs**.\n\n` +
+        `### Top Sistemas con Mayor Actividad de RFCs:\n\n` +
+        (topRfcsBySystem.length > 0
           ? topRfcsBySystem.slice(0, 6).map((r, idx) => {
-              const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '•'));
-              const sMatch = sistemasList.find(s => s.nombre.toLowerCase().includes(r.sistema_name.toLowerCase()));
-              const ownerStr = sMatch && sMatch.owner_nombre ? ` | *Titular TQS:* ${sMatch.owner_nombre}` : '';
-              return `${medal} **${r.sistema_name}** — **${r.rfc_count} RFCs**${ownerStr}`;
-            }).join('\n')
+            const sMatch = sistemasList.find(s => s.nombre.toLowerCase().includes(r.sistema_name.toLowerCase()));
+            const ownerStr = sMatch && sMatch.owner_nombre ? ` | Titular TQS: ${sMatch.owner_nombre}` : '';
+            return `[#${idx + 1}] **${r.sistema_name}** — **${r.rfc_count} RFCs**${ownerStr}`;
+          }).join('\n')
           : '• No se encontraron registros de RFCs asociados a sistemas.') +
-        `\n\n💡 **Tip de Operación:** Puedes explorar todos los RFCs de la plataforma o filtrar por ambiente en el tablero interactivo.`;
-
-      replyText += `\n\n[[ACTION:NAVIGATE|sheet|📄 Ver RFCs en Tablero]] [[ACTION:NAVIGATE|sistemas|🖥️ Ver Catálogo de Sistemas]]`;
+        `\n\n*Tip Operativo:* Puedes explorar el detalle de cada sistema desde el catálogo central o filtrar en el tablero de RFCs.`;
+      replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]] [[ACTION:NAVIGATE|sistemas|Catálogo de Sistemas]]';
     }
 
-    // Handler: "¿Qué sistema tiene más solicitudes?", "sistemas con más solicitudes"
-    if (!replyText && (qLower.includes('mas solicitud') || qLower.includes('más solicitud') || qLower.includes('mayor solicitud') || (qLower.includes('sistema') && (qLower.includes('mas') || qLower.includes('más')) && (qLower.includes('solicitud') || qLower.includes('incidente') || qLower.includes('ticket'))))) {
+    // 5. Ranking de Solicitudes por Sistema
+    if (!replyText && ((qNorm.includes('sistema') && qNorm.includes('mas') && (qNorm.includes('solicitud') || qNorm.includes('ticket'))) || qNorm.includes('mas solicitud') || qNorm.includes('mayor solicitud'))) {
       const topSys = topSolsBySystem.length > 0 ? topSolsBySystem[0] : null;
 
-      replyText = `🤖 **Atlas IA Copilot — Ranking de Solicitudes por Sistema**\n\n` +
+      replyText = `**Atlas IA Copilot — Ranking de Solicitudes por Sistema**\n\n` +
         `El sistema con mayor acumulado de solicitudes en ATLAS es **${topSys ? topSys.sistema_name : 'General'}** con un total de **${topSys ? topSys.sol_count : 0} solicitudes** registradas.\n\n` +
-        `### 📋 Top Sistemas con Mayor Número de Solicitudes:\n\n` +
+        `### Top Sistemas con Mayor Número de Solicitudes:\n\n` +
         (topSolsBySystem.length > 0
           ? topSolsBySystem.slice(0, 6).map((s, idx) => {
-              const medal = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : '•'));
-              return `${medal} **${s.sistema_name}** — **${s.sol_count} Solicitudes**`;
-            }).join('\n')
+            return `[#${idx + 1}] **${s.sistema_name}** — **${s.sol_count} Solicitudes**`;
+          }).join('\n')
           : '• No se encontraron registros de solicitudes asociadas a sistemas.') +
-        `\n\n💡 **Tip de Operación:** Puedes revisar las solicitudes en proceso o crear un nuevo ticket desde el panel operativo.`;
-
-      replyText += `\n\n[[ACTION:NAVIGATE|solicitudes|📋 Ir a Solicitudes Operativas]] [[ACTION:MODAL|new-solicitude|➕ Crear Solicitud]]`;
+        `\n\n*Tip:* Revisa las solicitudes en proceso o genera un ticket desde el módulo correspondiente.`;
+      replyText += '\n\n[[ACTION:NAVIGATE|solicitudes|Ir a Solicitudes]] [[ACTION:MODAL|new-solicitude|Crear Solicitud]]';
     }
 
-    if (!replyText && (qLower.includes('kit') || qLower.includes('incidente') || qLower.includes('ticket') || qLower.includes('rca') || qLower.includes('requerimiento') || qLower.includes('actividad'))) {
+    // 6. Solicitudes por Categoría (KIT, Incidente, etc.)
+    if (!replyText && (qNorm.includes('kit') || qNorm.includes('incidente') || qNorm.includes('ticket') || qNorm.includes('rca') || qNorm.includes('requerimiento') || qNorm.includes('actividad'))) {
       let targetType = '';
-      if (qLower.includes('kit')) targetType = 'KIT';
-      else if (qLower.includes('incidente') || qLower.includes('ticket')) targetType = 'Incidente';
-      else if (qLower.includes('rca')) targetType = 'RCA';
-      else if (qLower.includes('actividad')) targetType = 'Actividad';
-      else if (qLower.includes('requerimiento')) targetType = 'Requerimiento';
+      if (qNorm.includes('kit')) targetType = 'KIT';
+      else if (qNorm.includes('incidente')) targetType = 'Incidente';
+      else if (qNorm.includes('rca')) targetType = 'RCA';
+      else if (qNorm.includes('actividad')) targetType = 'Actividad';
+      else if (qNorm.includes('requerimiento')) targetType = 'Requerimiento';
 
       const matchingSols = solicitudesList.filter(s => (s.tipo || '').toLowerCase().includes(targetType.toLowerCase()));
-      replyText = `🤖 **Atlas IA Copilot — Razonamiento sobre Solicitudes (${targetType})**\n\n` +
-        `Se encontraron **${matchingSols.length} solicitudes** de tipo **${targetType}** registradas:\n\n` +
-        (matchingSols.length > 0 
-          ? matchingSols.slice(0, 8).map(s => `• **${s.ticket || s.id}** [${s.sistema_sap || 'SAP'}]: \`${s.estatus || 'En proceso'}\` — ${s.descripcion ? s.descripcion.slice(0, 60) + '...' : 'Sin detalle'}`).join('\n')
-          : `• No se registraron solicitudes activas para la categoría ${targetType} en el periodo actual.`) +
-        `\n\n*Total global de solicitudes:* ${solStatsRes.total_sols} (${solStatsRes.aprobadas} Aprobadas, ${solStatsRes.en_proceso} En proceso, ${solStatsRes.en_espera} En espera).`;
+      replyText = `**Atlas IA Copilot — Solicitudes de Categoría "${targetType}"**\n\n` +
+        `Se identificaron **${matchingSols.length} solicitudes** de tipo **${targetType}**:\n\n` +
+        (matchingSols.length > 0
+          ? matchingSols.slice(0, 8).map(s => `• **${s.id.slice(0, 8)}** [${s.sistema_sap || 'SAP'}]: \`${s.estatus || 'En proceso'}\` | Responsable: ${s.responsable || 'Sin asignar'}`).join('\n')
+          : `• No se registran solicitudes activas para la categoría ${targetType} en el periodo actual.`) +
+        `\n\n*Total de solicitudes en sistema:* ${solStatsRes.total_sols} (${solStatsRes.aprobadas} Aprobadas, ${solStatsRes.en_proceso} En proceso, ${solStatsRes.en_espera} En espera).`;
+      replyText += '\n\n[[ACTION:NAVIGATE|solicitudes|Ver Solicitudes]]';
     }
 
+    // 7. Sistemas por TQS Leader
+    if (!replyText && (qNorm.includes('sistema') && (qNorm.includes('tqs') || qNorm.includes('cuanto') || qNorm.includes('distribucion') || qNorm.includes('asignado')))) {
+      try {
+        const sysPerTqsRes = await pool.query(`
+          SELECT COALESCE(u.nombre, 'Sin Asignar') as owner_nombre, COUNT(s.id) as total_sistemas,
+                 ARRAY_AGG(s.nombre) as sistemas_nombres
+          FROM public.sistemas s
+          LEFT JOIN public.tqs_users u ON s.owner_id = u.id
+          GROUP BY owner_nombre
+          ORDER BY total_sistemas DESC
+        `);
+        const sysRows = sysPerTqsRes.rows || [];
+
+        replyText = `**Atlas IA Copilot — Distribución de Sistemas por Líder TQS**\n\n` +
+          `Actualmente hay **${sistemasList.length} sistemas** monitoreados en el catálogo central de ATLAS. Desglose por responsable:\n\n` +
+          (sysRows.length > 0
+            ? sysRows.map(r => `• **${r.owner_nombre}**: **${r.total_sistemas} sistema(s)** (${Array.isArray(r.sistemas_nombres) ? r.sistemas_nombres.slice(0, 5).join(', ') + (r.sistemas_nombres.length > 5 ? '...' : '') : ''})`).join('\n')
+            : '• _No se encontraron registros de asignación._') +
+          `\n\n*Tip:* Puedes reasignar o modificar sistemas desde la vista de Gestión de Sistemas.`;
+        replyText += '\n\n[[ACTION:NAVIGATE|sistemas|Catálogo de Sistemas]]';
+      } catch (eSysTqs) {
+        console.error('SYS_TQS_QUERY_ERROR', eSysTqs.message);
+      }
+    }
+
+    // 8. Consulta de un Sistema en específico
     if (!replyText) {
-      const matchedSys = sistemasList.find(s => qLower.includes(s.nombre.toLowerCase()));
+      const matchedSys = sistemasList.find(s => {
+        const nameLower = (s.nombre || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (nameLower.length <= 2) {
+          const regex = new RegExp('\\b' + nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+          return regex.test(userQuery);
+        }
+        return qNorm.includes(nameLower);
+      });
+
       if (matchedSys) {
         const sysRfcs = rfcsList.filter(r => (r.sistema_name || r.sistema || '').toLowerCase().includes(matchedSys.nombre.toLowerCase()));
-        const sysSols = solicitudesList.filter(s => (s.sistema_sap || s.sistema || '').toLowerCase().includes(matchedSys.nombre.toLowerCase()));
+        const sysSols = solicitudesList.filter(s => (s.sistema_sap || '').toLowerCase().includes(matchedSys.nombre.toLowerCase()));
 
-        replyText = `🤖 **Atlas IA Copilot — Análisis de Sistema "${matchedSys.nombre}"**\n\n` +
-          `• **Categoría:** ${matchedSys.tipo_sap} | **Infraestructura:** ${matchedSys.infraestructura}\n` +
-          `• **Nivel de Criticidad:** Nivel ${matchedSys.criticidad || '1'}\n` +
+        replyText = `**Atlas IA Copilot — Ficha Técnica del Sistema "${matchedSys.nombre}"**\n\n` +
+          `• **Tipo:** ${matchedSys.tipo_sap} | **Infraestructura:** ${matchedSys.infraestructura}\n` +
+          `• **Criticidad:** Nivel ${matchedSys.criticidad || '1'}\n` +
           `• **Titular (Owner):** ${matchedSys.owner_nombre || 'No asignado'}\n` +
-          `• **TQS Backup:** ${matchedSys.backup_nombre || 'No asignado'}\n\n` +
-          `**Actividad Acumulada en "${matchedSys.nombre}":**\n` +
+          `• **Backup TQS:** ${matchedSys.backup_nombre || 'No asignado'}\n\n` +
+          `**Historial Operativo en "${matchedSys.nombre}":**\n` +
           `• **RFCs Registrados:** ${sysRfcs.length} cambio(s)\n` +
-          `• **Solicitudes Registradas:** ${sysSols.length} solicitud(es)\n\n` +
-          (sysRfcs.length > 0 ? `*Último RFC:* \`${sysRfcs[0].ticket}\` (${sysRfcs[0].status}) - ${sysRfcs[0].descripcion || ''}\n` : '') +
-          (sysSols.length > 0 ? `*Última Solicitud:* \`${sysSols[0].ticket || sysSols[0].id}\` (${sysSols[0].estatus || ''}) - ${sysSols[0].descripcion || ''}` : '');
+          `• **Solicitudes:** ${sysSols.length} solicitud(es)\n\n` +
+          (sysRfcs.length > 0 ? `*Último RFC registrado:* \`${sysRfcs[0].ticket}\` (${sysRfcs[0].status}) - ${sysRfcs[0].descripcion || ''}\n` : '');
+        replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs]] [[ACTION:NAVIGATE|sistemas|Ver en Sistemas]]';
       }
     }
 
-    if (!replyText && (qLower.includes('responsable') || qLower.includes('tqs') || qLower.includes('leader') || qLower.includes('quien') || qLower.includes('encargado'))) {
-      const matchedUser = usersList.find(u => qLower.includes(u.nombre.toLowerCase()) || (u.email && qLower.includes(u.email.toLowerCase())));
+    // 9. Consulta de un Líder TQS
+    if (!replyText && (qNorm.includes('responsable') || qNorm.includes('tqs') || qNorm.includes('leader') || qNorm.includes('quien') || qNorm.includes('encargado'))) {
+      const matchedUser = usersList.find(u => qNorm.includes(u.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")) || (u.email && qNorm.includes(u.email.toLowerCase())));
       if (matchedUser) {
         const userSistemas = Array.isArray(matchedUser.sistemas) ? matchedUser.sistemas : [];
-        replyText = `🤖 **Atlas IA Copilot — Perfil del TQS Leader**\n\n` +
+        replyText = `**Atlas IA Copilot — Perfil de Líder TQS**\n\n` +
           `• **Nombre:** **${matchedUser.nombre}**\n` +
-          `• **Rol en Portal:** \`${matchedUser.rol}\`\n` +
+          `• **Rol:** \`${matchedUser.rol}\`\n` +
           `• **Correo:** \`${matchedUser.email}\`\n` +
           `• **Sistemas Asignados (${userSistemas.length}):** ${userSistemas.length > 0 ? userSistemas.join(', ') : 'Ninguno asignado aún'}`;
+        replyText += '\n\n[[ACTION:NAVIGATE|usuarios|Directorio de Usuarios]]';
       } else {
-        replyText = `🤖 **Atlas IA Copilot — Equipo de Líderes TQS**\n\n` +
-          `Hay **${usersList.length} usuarios activos** registrados en la plataforma ATLAS:\n\n` +
-          usersList.slice(0, 8).map(u => `• **${u.nombre}** (\`${u.rol}\`) — Sistemas: ${Array.isArray(u.sistemas) ? u.sistemas.length : 0}`).join('\n') +
-          `\n\n*Nota:* Puedes consultar el responsable de cualquier sistema escribiendo el nombre del sistema (ej: "Quién ve SAP SLT").`;
+        replyText = `**Atlas IA Copilot — Equipo de Líderes TQS**\n\n` +
+          `Existen **${usersList.length} especialistas activos** en ATLAS:\n\n` +
+          usersList.map(u => `• **${u.nombre}** (\`${u.rol}\`) — ${Array.isArray(u.sistemas) ? u.sistemas.length : 0} sistema(s)`).join('\n') +
+          `\n\n*Tip:* Puedes consultar la cobertura de cualquier sistema preguntando *"Quién ve [Nombre Sistema]"*.`;
+        replyText += '\n\n[[ACTION:NAVIGATE|usuarios|Directorio de Usuarios]]';
       }
     }
 
-    if (!replyText && (qLower.includes('resumen') || qLower.includes('reporte') || qLower.includes('total') || qLower.includes('metrica') || qLower.includes('estadistica') || qLower.includes('cuanto'))) {
-      replyText = `🤖 **Atlas IA Copilot — Reporte Ejecutivo Consolidado**\n\n` +
-        `### 📊 Estado General de Operaciones ATLAS\n\n` +
+    // 10. Resumen Ejecutivo General
+    if (!replyText && (qNorm.includes('resumen') || qNorm.includes('reporte') || qNorm.includes('metrica') || qNorm.includes('estadistica') || qNorm.includes('estado general'))) {
+      const pctExito = statsRes.total_rfcs > 0 ? ((parseInt(statsRes.aprobados, 10) / parseInt(statsRes.total_rfcs, 10)) * 100).toFixed(1) : 0;
+      replyText = `**Atlas IA Copilot — Reporte Ejecutivo de Operaciones**\n\n` +
+        `### Métricas Consolidadas en Tiempo Real\n\n` +
         `| Métrica Operativa | RFCs de Cambio | Solicitudes Operativas |\n` +
         `| :--- | :---: | :---: |\n` +
         `| **Registros Totales** | **${statsRes.total_rfcs}** | **${solStatsRes.total_sols}** |\n` +
-        `| **Aprobados / Exitosos** | ${statsRes.aprobados} | ${solStatsRes.aprobadas} |\n` +
+        `| **Aprobados / Exitosos** | ${statsRes.aprobados} (${pctExito}%) | ${solStatsRes.aprobadas} |\n` +
         `| **En Proceso / Pendientes** | ${statsRes.pendientes} | ${solStatsRes.en_proceso} |\n` +
         `| **En Espera Autorización** | — | ${solStatsRes.en_espera} |\n` +
         `| **Fallidos / Cancelados** | ${statsRes.fallidos} | ${solStatsRes.canceladas} |\n\n` +
-        `• **Ambientes RFCs:** PRD (${statsRes.prd_count}) · QAS (${statsRes.qas_count}) · DEV (${statsRes.dev_count})\n` +
-        `• **Sistemas Activos Monitoreados:** ${sistemasList.length} sistemas (SAP y No SAP)`;
+        `• **Distribución por Ambiente (RFCs):** PRD (${statsRes.prd_count}) · QAS (${statsRes.qas_count}) · DEV (${statsRes.dev_count})\n` +
+        `• **Catálogo de Sistemas Monitoreados:** ${sistemasList.length} sistemas activos\n` +
+        `• **Especialistas TQS:** ${usersList.length} líderes operativos`;
+      replyText += '\n\n[[ACTION:NAVIGATE|direccion|Dashboard Dirección]] [[ACTION:NAVIGATE|sheet|Ver RFCs]]';
     }
 
+    // 11. Fallback Contextual Genérico Inteligente
     if (!replyText) {
-      replyText = `🤖 **Atlas IA Copilot — Motor de Razonamiento Autónomo**\n\n` +
+      replyText = `**Atlas IA Copilot — Motor Operativo ATLAS**\n\n` +
         `He analizado tu consulta: *"_${userQuery}_"*\n\n` +
-        `**Estado de la plataforma ATLAS:**\n` +
-        `• **RFCs Operativos:** ${statsRes.total_rfcs} registrados (${statsRes.aprobados} exitosos, ${statsRes.pendientes} pendientes, ${statsRes.prd_count} en PRD).\n` +
-        `• **Solicitudes Operativas:** ${solStatsRes.total_sols} acumuladas (${solStatsRes.en_proceso} en proceso, ${solStatsRes.aprobadas} aprobadas).\n` +
-        `• **Sistemas Administrados:** ${sistemasList.length} sistemas vinculados.\n\n` +
-        `**Sugerencias de Consulta:**\n` +
-        `1. *"Muestra las solicitudes tipo Incidente"* o *"KITs registrados"*\n` +
-        `2. *"Quién es el responsable de [Nombre de Sistema]"*\n` +
-        `3. *"Estado del ticket [RFC-123 o INC-456]"*\n` +
-        `4. *"Resumen ejecutivo de operaciones"*`;
+        `**Estado operativo en vivo:**\n` +
+        `• **RFCs en PostgreSQL:** **${statsRes.total_rfcs}** cambios registrados (${statsRes.aprobados} exitosos, ${statsRes.pendientes} pendientes de cierre).\n` +
+        `• **Solicitudes Activas:** **${solStatsRes.total_sols}** tickets acumulados.\n` +
+        `• **Sistemas Administrados:** **${sistemasList.length}** plataformas vinculadas.\n\n` +
+        `**Consultas sugeridas:**\n` +
+        `1. *"¿Cuántos RFCs hay registrados y cuál es su desglose?"*\n` +
+        `2. *"¿Qué sistema tiene más RFCs?"*\n` +
+        `3. *"¿Cuáles RFCs están pendientes de VOBO?"*\n` +
+        `4. *"¿Quién ve el sistema [Nombre]?"*`;
     }
 
-            if (qLower.includes('solicitud') || qLower.includes('ticket') || qLower.includes('incidente') || qLower.includes('kit') || qLower.includes('rca')) {
-      replyText += '\n\n[[ACTION:NAVIGATE|solicitudes|Ir a Solicitudes Operativas]] [[ACTION:MODAL|new-solicitude|Crear Solicitud]]';
-    } else if (qLower.includes('rfc') || qLower.includes('cambio') || qLower.includes('prd') || qLower.includes('vobo')) {
-      replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]] [[ACTION:MODAL|new-rfc|Crear RFC]]';
-    } else {
-      replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs]] [[ACTION:NAVIGATE|solicitudes|Ver Solicitudes]]';
+    // Asegurar que las acciones no se dupliquen
+    if (!replyText.includes('[[ACTION:')) {
+      if (qNorm.includes('solicitud') || qNorm.includes('ticket') || qNorm.includes('incidente') || qNorm.includes('kit')) {
+        replyText += '\n\n[[ACTION:NAVIGATE|solicitudes|Ir a Solicitudes]] [[ACTION:MODAL|new-solicitude|Crear Solicitud]]';
+      } else if (qNorm.includes('rfc') || qNorm.includes('cambio') || qNorm.includes('prd') || qNorm.includes('vobo')) {
+        replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs en Tablero]] [[ACTION:MODAL|new-rfc|Crear RFC]]';
+      } else {
+        replyText += '\n\n[[ACTION:NAVIGATE|sheet|Ver RFCs]] [[ACTION:NAVIGATE|sistemas|Catálogo de Sistemas]]';
+      }
     }
-    return res.json({ reply: replyText, provider: 'Atlas IA Copilot (Generative Reasoning Engine)' });
+    return res.json({ reply: replyText, provider: 'Atlas IA Copilot (Motor Contextual PostgreSQL)' });
   } catch (err) {
     logger.error({ err: err.message, stack: err.stack }, 'AI_CHAT_ERROR');
     return res.status(500).json({ error: 'Error procesando consulta en ATLAS Copilot: ' + err.message });
@@ -2249,6 +2926,7 @@ app.post('/api/ai/executive-report', authenticateToken, requireAuth, requireRole
         COUNT(*) FILTER (WHERE status = 'En espera de VOBO' OR status = 'Pendiente') as pendientes,
         COUNT(*) FILTER (WHERE ambiente = 'PRD') as prd_count,
         COUNT(*) FILTER (WHERE ambiente = 'QAS') as qas_count,
+        COUNT(*) FILTER (WHERE ambiente = 'PPRD') as pprd_count,
         COUNT(*) FILTER (WHERE ambiente = 'DEV') as dev_count
       FROM public.rfcs
     `);
@@ -2267,7 +2945,7 @@ DATOS OPERATIVOS ACTUALES DE ATLAS:
 - Total RFCs Registrados: ${statsRes.rows[0]?.total_rfcs || 0}
 - RFCs Aprobados/Completados: ${statsRes.rows[0]?.aprobados || 0}
 - RFCs Pendientes / VOBO: ${statsRes.rows[0]?.pendientes || 0}
-- Distribución por Ambiente: PRD (${statsRes.rows[0]?.prd_count || 0}), QAS (${statsRes.rows[0]?.qas_count || 0}), DEV (${statsRes.rows[0]?.dev_count || 0})
+- Distribución por Ambiente: PRD (${statsRes.rows[0]?.prd_count || 0}), QAS (${statsRes.rows[0]?.qas_count || 0}), PPRD (${statsRes.rows[0]?.pprd_count || 0}), DEV (${statsRes.rows[0]?.dev_count || 0})
 - Sistemas SAP Activos (${sistemasRes.rows.length}): ${sistemasRes.rows.map(s => s.nombre).join(', ')}
 
 LISTA DE ULTIMOS RFCs:
@@ -2281,7 +2959,7 @@ Estructura el reporte con las siguientes secciones en Markdown:
 
 Utiliza emojis apropiados, tablas en Markdown y un tono profesional ejecutivo.`;
 
-const reportController = new AbortController();
+    const reportController = new AbortController();
     const reportTimeoutId = setTimeout(() => reportController.abort(), 60000);
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2345,6 +3023,9 @@ function calculateRfcHeuristicRisk(rfc, dbSystemsMap = {}, existingRfcsList = []
   if (ambiente === 'PRD' || (sid && sid.includes('PRD'))) {
     score += 30;
     factors.push('Ambiente de Producción (PRD): +30 pts');
+  } else if (ambiente === 'PPRD' || (sid && sid.includes('PPRD'))) {
+    score += 20;
+    factors.push('Ambiente PreProductivo (PPRD): +20 pts');
   } else if (ambiente === 'QAS' || (sid && sid.includes('QAS'))) {
     score += 15;
     factors.push('Ambiente de Calidad (QAS): +15 pts');
@@ -2447,284 +3128,6 @@ app.get('/api/heuristics/recommend-tqs', authenticateToken, requireAuth, async (
   }
 });
 
-app.post('/api/rfcs/bulk-upload', authenticateToken, requireAuth, requireRole('admin', 'tqs_leader'), async (req, res) => {
-  const { rfcs } = req.body;
-  if (!Array.isArray(rfcs) || rfcs.length === 0) {
-    return res.status(400).json({ error: 'La propiedad rfcs debe ser un arreglo no vacío.' });
-  }
-
-  const normalizeRfcStatus = (rawStatus) => {
-    if (!rawStatus) return 'Finalizado con éxito';
-    const str = String(rawStatus).trim();
-    if (!str) return 'Finalizado con éxito';
-    const norm = str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-    if (norm.includes('sin exito') || norm.includes('fall') || norm.includes('error') || norm.includes('fracas') || norm.includes('no exit')) {
-      return 'Finalizado sin éxito';
-    }
-    if (norm.includes('exito') || norm.includes('concluid') || norm.includes('finalizad') || norm.includes('completad') || norm.includes('cerrad') || norm.includes('ok') || norm.includes('realizad') || norm.includes('terminad')) {
-      return 'Finalizado con éxito';
-    }
-    if (norm.includes('ejecuc') || norm.includes('proceso') || norm.includes('curs') || norm.includes('ejecutando')) {
-      return 'En Ejecución';
-    }
-    if (norm.includes('vobo') || norm.includes('espera') || norm.includes('pendien')) {
-      return 'En espera de VOBO';
-    }
-    if (norm.includes('aprob')) {
-      return 'Aprobado';
-    }
-    if (norm.includes('cancel')) {
-      return 'Cancelado';
-    }
-    if (norm.includes('reprogram')) {
-      return 'Reprogramar';
-    }
-
-    const allowed = ['En espera de VOBO', 'En Ejecución', 'Finalizado con éxito', 'Finalizado sin éxito', 'Aprobado', 'Cancelado', 'Reprogramar'];
-    const exact = allowed.find(a => a.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === norm);
-    if (exact) return exact;
-
-    return 'Finalizado con éxito';
-  };
-
-  const cleanDate = (d) => {
-    if (!d) return null;
-    const s = String(d).trim();
-    if (!s || s === '-' || s === 'null' || s === 'undefined') return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    const parsed = new Date(s);
-    if (isNaN(parsed.getTime())) return null;
-    return parsed.toISOString().split('T')[0];
-  };
-
-  const cleanTime = (t) => {
-    if (!t) return null;
-    const s = String(t).trim();
-    if (!s || s === '-' || s === 'null' || s === 'undefined') return null;
-    return s;
-  };
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    
-    const ownerRes = await client.query("SELECT id FROM public.tqs_users WHERE rol = 'admin' LIMIT 1");
-    const defaultOwnerId = ownerRes.rows[0]?.id || '00000000-0000-0000-0000-000000000001';
-
-    // Deduplicate incoming RFCs by (ticket, sistema_name) key to allow same ticket on different systems
-    const ticketMap = new Map();
-    for (let idx = 0; idx < rfcs.length; idx++) {
-      const item = rfcs[idx];
-      if (!item) continue;
-      const t = String(item.ticket || item['ticket (rfc)'] || item.num_ticket || '').trim();
-      const s = String(item.sistema_name || item.sistema || 'SAP General').trim();
-      const ticketKey = t || `RFC-${Date.now()}-${idx}`;
-      const compositeKey = `${ticketKey}___${s}`;
-      ticketMap.set(compositeKey, { ...item, ticket: ticketKey, sistema_name: s });
-    }
-    const deduplicatedRfcs = Array.from(ticketMap.values());
-
-    const chunkSize = 100;
-    let insertedCount = 0;
-
-    for (let i = 0; i < deduplicatedRfcs.length; i += chunkSize) {
-      const chunk = deduplicatedRfcs.slice(i, i + chunkSize);
-      const values = [];
-      const valueStrings = [];
-      let pIdx = 1;
-
-      for (const item of chunk) {
-        const ticket = String(item.ticket || `RFC-${Date.now()}-${Math.floor(Math.random()*1000)}`).trim();
-        const tipo = String(item.tipo || 'RFC').trim();
-        const ambiente = String(item.ambiente || 'Azure').trim();
-        const sid = String(item.sid || item.sistema_sid || 'PRD').trim();
-        const fecha = cleanDate(item.fecha || item.fecha_inicio) || new Date().toISOString().split('T')[0];
-        const fecha_fin = cleanDate(item.fecha_fin || item.fecha);
-        const fecha_fin_retorno = cleanDate(item.fecha_fin_retorno || item.fecha_retorno);
-        const sistema_name = String(item.sistema_name || item.sistema || 'SAP General').trim();
-        const promotor = String(item.promotor || item.solicitante || 'Carga Masiva').trim();
-        const coordinador_kof = String(item.coordinador_kof || item.coordinador || '').trim();
-        const descripcion = String(item.descripcion || 'RFC importado por carga inicial').trim();
-        const observaciones = String(item.observaciones || '').trim();
-        const status = normalizeRfcStatus(item.status || item.estatus || item.estado);
-        const hora_inicio = cleanTime(item.hora_inicio) || '00:00';
-        const hora_fin = cleanTime(item.hora_fin) || '23:59';
-        const hora_fin_retorno = cleanTime(item.hora_fin_retorno || item.hora_retorno);
-
-        valueStrings.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++})`);
-        values.push(
-          ticket, tipo, ambiente, sid, fecha, fecha_fin, fecha_fin_retorno,
-          sistema_name, promotor, coordinador_kof, descripcion, observaciones, status,
-          hora_inicio, hora_fin, hora_fin_retorno, defaultOwnerId
-        );
-      }
-
-      const batchSql = `
-        INSERT INTO public.rfcs (
-          ticket, tipo, ambiente, sid, fecha, fecha_fin, fecha_fin_retorno,
-          sistema_name, promotor, coordinador_kof, descripcion, observaciones, status,
-          hora_inicio, hora_fin, hora_fin_retorno, owner_id
-        ) VALUES ${valueStrings.join(', ')}
-        ON CONFLICT (ticket, sistema_name) DO UPDATE SET
-          tipo = EXCLUDED.tipo,
-          ambiente = EXCLUDED.ambiente,
-          sid = EXCLUDED.sid,
-          fecha = EXCLUDED.fecha,
-          fecha_fin = EXCLUDED.fecha_fin,
-          fecha_fin_retorno = EXCLUDED.fecha_fin_retorno,
-          sistema_name = EXCLUDED.sistema_name,
-          promotor = EXCLUDED.promotor,
-          coordinador_kof = EXCLUDED.coordinador_kof,
-          descripcion = EXCLUDED.descripcion,
-          observaciones = EXCLUDED.observaciones,
-          status = EXCLUDED.status,
-          hora_inicio = EXCLUDED.hora_inicio,
-          hora_fin = EXCLUDED.hora_fin,
-          hora_fin_retorno = EXCLUDED.hora_fin_retorno,
-          updated_at = NOW()
-      `;
-
-      await client.query(batchSql, values);
-      insertedCount += chunk.length;
-    }
-
-    await client.query('COMMIT');
-    logger.info({ count: insertedCount }, 'BULK_UPLOAD completed');
-    return res.json({ ok: true, count: insertedCount, message: `Se importaron ${insertedCount} RFCs exitosamente.` });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    logger.error({ err: err.message, stack: err.stack }, 'BULK_UPLOAD_ERROR');
-    return res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
-  }
-});
-
-app.delete('/api/rfcs/purge-all', authenticateToken, requireAuth, requireRole('admin'), async (req, res) => {
-  try {
-    await pool.query('DELETE FROM public.rfcs');
-    logger.info({}, 'BULK_PURGE completed');
-    return res.json({ ok: true, message: 'Se eliminaron todos los RFCs exitosamente.' });
-  } catch (err) {
-    logger.error({ err: err.message, stack: err.stack }, 'BULK_PURGE_ERROR');
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-const MESES_NOMBRES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-function formatFechasAMeses(fechasArr) {
-  if (!fechasArr || fechasArr.length === 0) return 'Julio 2026';
-  const mesesSet = new Set();
-  fechasArr.forEach(f => {
-    if (!f) return;
-    let str = String(f).trim().split('T')[0];
-    const parts = str.split('-');
-    if (parts.length >= 2) {
-      const y = parts[0];
-      const m = parseInt(parts[1], 10) - 1;
-      if (m >= 0 && m < 12) {
-        mesesSet.add(`${MESES_NOMBRES[m]} ${y}`);
-      }
-    }
-  });
-  return Array.from(mesesSet).join(', ') || 'Julio 2026';
-}
-
-app.post('/api/ai/chat-contextual', authenticateToken, requireAuth, async (req, res) => {
-  try {
-    const { prompt = '', messages = [] } = req.body;
-    const userQuery = prompt || (messages.length > 0 ? messages[messages.length - 1].content : '');
-    const queryLower = userQuery.toLowerCase();
-
-    const sistemasRes = await pool.query(`
-      SELECT nombre, infraestructura, tipo_sap, criticidad 
-      FROM public.sistemas 
-      ORDER BY nombre ASC
-    `);
-    const sistemas = sistemasRes.rows || [];
-
-    const sapSystems = sistemas.filter(s => (s.tipo_sap || '').toUpperCase() === 'SAP');
-    const noSapSystems = sistemas.filter(s => (s.tipo_sap || '').toUpperCase() !== 'SAP');
-
-    const topRfcsRes = await pool.query(`
-      SELECT COALESCE(NULLIF(sistema_name, ''), 'Sin Sistema') as sys_name, 
-             COUNT(*) as total_rfcs,
-             COUNT(*) FILTER (WHERE LOWER(status) LIKE '%éxito%' AND LOWER(status) NOT LIKE '%sin%') as exito_rfcs,
-             COUNT(*) FILTER (WHERE LOWER(status) LIKE '%espera%' OR LOWER(status) LIKE '%vobo%') as espera_rfcs,
-             ARRAY_AGG(DISTINCT fecha) as fechas
-      FROM public.rfcs
-      GROUP BY sys_name
-      ORDER BY total_rfcs DESC
-    `);
-    const rfcStatsBySystem = topRfcsRes.rows || [];
-
-    const totalRfcsRes = await pool.query(`SELECT COUNT(*) as total FROM public.rfcs`);
-    const totalRfcsCount = parseInt(totalRfcsRes.rows[0]?.total || 0, 10);
-
-    let reply = '';
-
-    if (queryLower.includes('resumen') || queryLower.includes('más cambios') || queryLower.includes('mas cambios') || queryLower.includes('top') || queryLower.includes('volumen') || queryLower.includes('sistemas') || queryLower.includes('mes')) {
-      reply += `🤖 **Atlas IA Copilot**\n\n`;
-      reply += `**Resumen de Sistemas Registrados con Cambios y Meses de Ejecución (PostgreSQL en Vivo):**\n\n`;
-      reply += `📊 **Métricas Globales:**\n`;
-      reply += `• Total Sistemas Administrados en Catálogo: **${sistemas.length}** (${sapSystems.length} SAP, ${noSapSystems.length} No SAP)\n`;
-      reply += `• Total RFCs Registrados en BD: **${totalRfcsCount}**\n\n`;
-
-      reply += `🔥 **Sistemas Activos con Cambios Registrados y Periodo:**\n\n`;
-      if (rfcStatsBySystem.length === 0) {
-        reply += `_Aún no hay RFCs registrados en el sistema. Puedes realizar una Carga Masiva Inicial desde el menú lateral._\n`;
-      } else {
-        rfcStatsBySystem.forEach((r, idx) => {
-          const mesesStr = formatFechasAMeses(r.fechas);
-          reply += `${idx + 1}. **${r.sys_name}**: **${r.total_rfcs} RFCs**\n`;
-          reply += `   📅 **Mes de ejecución:** ${mesesStr}\n`;
-          reply += `   ✅ **Estatus:** ${r.exito_rfcs} finalizados con éxito | ⏳ ${r.espera_rfcs} en espera VOBO\n\n`;
-        });
-      }
-
-      reply += `💡 **Tip de Operaciones:** Puedes filtrar los RFCs por fecha y criticidad directamente desde el Dashboard.`;
-    } 
-    else if (queryLower.includes('rfc') || queryLower.includes('estatus') || queryLower.includes('vobo') || queryLower.includes('ejecucion')) {
-      const statusRes = await pool.query(`
-        SELECT 
-          COUNT(*) FILTER (WHERE LOWER(status) LIKE '%éxito%' AND LOWER(status) NOT LIKE '%sin%') as exito,
-          COUNT(*) FILTER (WHERE LOWER(status) LIKE '%espera%' OR LOWER(status) LIKE '%vobo%') as espera,
-          COUNT(*) FILTER (WHERE LOWER(status) LIKE '%cancel%') as cancelados,
-          COUNT(*) as total
-        FROM public.rfcs
-      `);
-      const st = statusRes.rows[0] || {};
-      reply += `🤖 **Atlas IA Copilot**\n\n`;
-      reply += `**Estado Actual de Operaciones RFC (PostgreSQL en Vivo):**\n\n`;
-      reply += `• **Total de RFCs:** ${st.total || 0}\n`;
-      reply += `• **Finalizados con Éxito:** ${st.exito || 0}\n`;
-      reply += `• **En Espera de VOBO:** ${st.espera || 0}\n`;
-      reply += `• **Cancelados / Reprogramados:** ${st.cancelados || 0}\n`;
-    }
-    else {
-      reply += `🤖 **Atlas IA Copilot**\n\n`;
-      reply += `Hola. He consultado el motor contextual PostgreSQL para *"${userQuery}"*:\n\n`;
-      reply += `• **Sistemas Administrados:** ${sistemas.length} (${sapSystems.length} SAP, ${noSapSystems.length} No SAP)\n`;
-      reply += `• **Total RFCs Registrados:** ${totalRfcsCount}\n`;
-      if (rfcStatsBySystem.length > 0) {
-        reply += `• **Sistema con Mayor Actividad:** ${rfcStatsBySystem[0].sys_name} (${rfcStatsBySystem[0].total_rfcs} RFCs - ${formatFechasAMeses(rfcStatsBySystem[0].fechas)})\n`;
-      }
-      reply += `\nPuedes solicitar un resumen de los sistemas con más cambios o indicar el mes de ejecución.`;
-    }
-
-    return res.json({
-      ok: true,
-      provider: 'Atlas IA Copilot (Motor Contextual PostgreSQL)',
-      reply: reply
-    });
-  } catch (err) {
-    logger.error({ err: err.message, stack: err.stack }, 'AI_CHAT_ERROR');
-    return res.status(500).json({ error: 'Error al procesar consulta en el motor contextual.' });
-  }
-});
-
 // ============================================================
 // OPCIÓN 3: ANÁLISIS PREDICTIVO DE RIESGOS EN RFCS (DB EN VIVO)
 // ============================================================
@@ -2732,7 +3135,7 @@ app.post('/api/ai/risk-analysis', authenticateToken, requireAuth, async (req, re
   try {
     const { systemName = '', environment = 'PRD', fecha = '' } = req.body;
     const targetDate = fecha || new Date().toISOString().split('T')[0];
-    
+
     const concurrentRes = await pool.query(
       `SELECT ticket, sistema_name, ambiente, fecha, status, promotor 
        FROM public.rfcs 
@@ -2741,10 +3144,10 @@ app.post('/api/ai/risk-analysis', authenticateToken, requireAuth, async (req, re
     );
 
     const isPrd = environment.toUpperCase() === 'PRD';
-    const systemCollisions = concurrentRes.rows.filter(r => 
+    const systemCollisions = concurrentRes.rows.filter(r =>
       r.sistema_name && r.sistema_name.toLowerCase().includes(systemName.toLowerCase())
     );
-    
+
     let riskLevel = 'LOW';
     let riskScore = 15;
     let reasons = [];
@@ -2841,7 +3244,7 @@ app.get('/api/ai/knowledge', authenticateToken, requireAuth, async (req, res) =>
 app.get('/api/ai/proactive-alerts', authenticateToken, requireAuth, async (req, res) => {
   try {
     const todayStr = new Date().toISOString().split('T')[0];
-    
+
     const prdTodayRes = await pool.query(
       `SELECT ticket, sistema_name, ambiente, status, hora_inicio 
        FROM public.rfcs 
@@ -2885,6 +3288,177 @@ app.get('/api/ai/proactive-alerts', authenticateToken, requireAuth, async (req, 
   }
 });
 
+// ── PROGRAMACIÓN AUTOMÁTICA DE ALERTAS MS TEAMS (9:00 AM y 18:00 PM CDMX) ──
+let lastTeamsAlertSentKey = '';
+
+function getDiasRestantesText(fechaVal) {
+  if (!fechaVal) return 'Sin fecha';
+  const target = new Date(fechaVal);
+  if (isNaN(target.getTime())) return 'Sin fecha';
+
+  const now = new Date();
+  const cdmxNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+  cdmxNow.setHours(0, 0, 0, 0);
+
+  const cdmxTarget = new Date(target.toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+  cdmxTarget.setHours(0, 0, 0, 0);
+
+  const diffMs = cdmxTarget.getTime() - cdmxNow.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return '¡HOY!';
+  if (diffDays === 1) return '1 día';
+  if (diffDays === -1) return '-1 día';
+  return `${diffDays} días`;
+}
+
+async function triggerTeamsScheduledNotification(periodLabel = 'ALERTA PROGRAMADA DIARIA') {
+  try {
+    const isNineAM = periodLabel.includes('09:00') || periodLabel.includes('MATUTINA') || periodLabel.includes('9:00');
+    const isSixPM = periodLabel.includes('18:00') || periodLabel.includes('CIERRE') || periodLabel.includes('6:00');
+
+    const now = new Date();
+    const cdmxDate = new Date(now.toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+    const dateStr = `${cdmxDate.getFullYear()}-${String(cdmxDate.getMonth() + 1).padStart(2, '0')}-${String(cdmxDate.getDate()).padStart(2, '0')}`;
+    const slotKey = isNineAM ? `TEAMS_SLOT_09AM_${dateStr}` : isSixPM ? `TEAMS_SLOT_18PM_${dateStr}` : null;
+
+    if (slotKey) {
+      // Bloqueo estricto en BD: evitar disparos duplicados entre cron interno, n8n y reinicios de proceso
+      const checkRes = await pool.query(
+        `SELECT id, created_at FROM public.log_auditoria 
+         WHERE accion = 'TEAMS_NOTIFICATION_SENT' 
+           AND detalles ILIKE $1 
+           AND created_at >= NOW() - INTERVAL '3 hours' 
+         LIMIT 1`,
+        [`%${slotKey}%`]
+      );
+      if (checkRes.rows.length > 0) {
+        logger.info({ slotKey, periodLabel, sentEarlier: checkRes.rows[0].created_at }, 'TEAMS_SCHEDULED_ALERT_DUPLICATE_PREVENTED');
+        return { ok: true, periodLabel, skipped: true, reason: 'Alerta ya enviada en este bloque horario (deduplicada por BD)' };
+      }
+      lastTeamsAlertSentKey = slotKey;
+    }
+    const rfcsRes = await pool.query(`
+      SELECT 
+        r.id,
+        COALESCE(r.ticket, 'N/A') AS ticket,
+        COALESCE(s.nombre, r.sistema_name, 'SAP General') AS sistema,
+        COALESCE(u_rfc.nombre, u_sys.nombre, r.promotor, 'Sin TQS asignado') AS tqs_responsable,
+        r.status,
+        r.fecha,
+        r.descripcion,
+        r.infraestructura
+      FROM public.rfcs r
+      LEFT JOIN public.sistemas s ON r.sistema_name = s.nombre
+      LEFT JOIN public.tqs_users u_rfc ON r.owner_id = u_rfc.id
+      LEFT JOIN public.tqs_users u_sys ON s.owner_id = u_sys.id
+      WHERE r.deleted_at IS NULL
+        AND (
+          r.status ILIKE '%VOBO%' 
+          OR r.status ILIKE '%Alarmad%' 
+          OR r.status ILIKE '%Ejecuci%' 
+          OR r.status ILIKE '%Reprogramad%' 
+          OR r.status ILIKE '%espera%'
+          OR r.status ILIKE '%Pendiente%'
+        )
+      ORDER BY r.fecha ASC LIMIT 30
+    `);
+
+    const pendingCount = rfcsRes.rows.length;
+    const formattedDateStr = new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" });
+
+    let message = `### **ATLAS SAP Operations — ${periodLabel}**\n\n`;
+    message += `**Fecha / Hora (CDMX):** ${formattedDateStr}\n`;
+    message += `**RFCs Pendientes / Alertas Activas:** \`${pendingCount}\`\n\n`;
+
+    if (pendingCount === 0) {
+      message += `*Excelente: Sin RFCs en estado alarmado o pendientes de VOBO en este momento.*\n`;
+    } else {
+      message += `#### **Desglose de RFCs por Responsable TQS y Sistema:**\n\n`;
+      message += `| Responsable TQS | Ticket / RFC | Sistema SAP | Estatus | Días Restantes |\n`;
+      message += `|---|---|---|---|---|\n`;
+
+      rfcsRes.rows.forEach(r => {
+        const diasRestantes = getDiasRestantesText(r.fecha);
+        message += `| **${r.tqs_responsable}** | **${r.ticket}** | ${r.sistema} | \`${r.status}\` | ${diasRestantes} |\n`;
+      });
+    }
+
+    message += `\n\n[Abrir Atlas SAP Operations](https://atlas.easconsulting.com.mx)`;
+
+    const sentOk = await sendTeamsNotification({
+      modulo: 'Alertas Programadas',
+      titulo: `ATLAS SAP — ${periodLabel}`,
+      detalles: message,
+      type: 'SCHEDULED_ALERT'
+    });
+
+    try {
+      await pool.query(
+        `INSERT INTO public.log_auditoria (usuario_email, ip_address, accion, modulo, nivel, detalles) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        ['SYSTEM_SCHEDULED', '127.0.0.1', 'TEAMS_NOTIFICATION_SENT', 'Teams Alerts', 'INFO',
+          JSON.stringify({ slotKey: slotKey || 'MANUAL', periodLabel, sentOk, pendingCount, timestamp: now.toISOString() })]
+      );
+    } catch (eLog) {
+      logger.warn({ err: eLog.message }, 'LOG_AUDITORIA_TEAMS_INSERT_FAIL');
+    }
+
+    logger.info({ periodLabel, sentOk, count: pendingCount, slotKey }, 'TEAMS_SCHEDULED_ALERT_DISPATCHED');
+    return { ok: true, periodLabel, count: pendingCount, sentOk };
+  } catch (err) {
+    logger.error({ err: err.message }, 'TRIGGER_TEAMS_SCHEDULED_ERROR');
+    throw err;
+  }
+}
+
+async function checkAndSendScheduledTeamsAlerts() {
+  try {
+    const now = new Date();
+    const cdmxTimeStr = now.toLocaleString("en-US", { timeZone: "America/Mexico_City" });
+    const cdmxDate = new Date(cdmxTimeStr);
+    const hours = cdmxDate.getHours();
+    const minutes = cdmxDate.getMinutes();
+    const dateStr = `${cdmxDate.getFullYear()}-${String(cdmxDate.getMonth() + 1).padStart(2, '0')}-${String(cdmxDate.getDate()).padStart(2, '0')}`;
+
+    const isNineAM = (hours === 9 && minutes < 10);
+    const isSixPM = (hours === 18 && minutes < 10);
+
+    if (isNineAM || isSixPM) {
+      const slotKey = isNineAM ? `TEAMS_SLOT_09AM_${dateStr}` : `TEAMS_SLOT_18PM_${dateStr}`;
+      if (lastTeamsAlertSentKey === slotKey) return;
+      const periodLabel = isNineAM ? 'ALERTA MATUTINA (09:00 AM)' : 'CIERRE DE JORNADA (18:00 PM)';
+      await triggerTeamsScheduledNotification(periodLabel);
+    }
+  } catch (err) {
+    logger.error({ err: err.message }, 'SCHEDULED_TEAMS_ALERT_CHECK_FAIL');
+  }
+}
+
+// Ejecutar verificación de horario cada 60 segundos
+setInterval(checkAndSendScheduledTeamsAlerts, 60000);
+
+// Middleware de autorización para n8n o cron interno
+const isAuthorizedForTrigger = (req, res, next) => {
+  const secret = req.headers['x-atlas-cron-secret'];
+  const clientIp = req.ip || req.connection?.remoteAddress || '';
+  if (secret === 'EAS_ATLAS_TEAMS_SECRET_2026' || clientIp.includes('10.10.10.103') || clientIp.includes('127.0.0.1')) {
+    return next();
+  }
+  return authenticateToken(req, res, () => requireAuth(req, res, next));
+};
+
+// Endpoint para disparar la alerta programada de Teams (Soporta n8n y llamadas manuales)
+app.post('/api/notifications/teams/trigger-scheduled', isAuthorizedForTrigger, async (req, res) => {
+  try {
+    const label = req.body?.label || 'PRUEBA MANUAL ALERTA DIARIA (9:00 AM / 18:00 PM)';
+    const result = await triggerTeamsScheduledNotification(label);
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint para recibir y registrar en BD errores generados en el cliente / frontend
 app.post('/api/log-client-error', async (req, res) => {
   try {
@@ -2910,7 +3484,7 @@ app.post('/api/log-client-error', async (req, res) => {
 app.use((err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
-  
+
   logApp(
     'ERROR',
     'EXPRESS_ROUTER',
@@ -2951,4 +3525,10 @@ process.on('unhandledRejection', (reason) => {
 
 app.listen(port, () => {
   logger.info({ port }, 'ATLAS API Server running');
+  logApp('INFO', 'SYSTEM', `Servidor ATLAS API iniciado exitosamente en puerto ${port}`, null, {
+    nodeVersion: process.version,
+    platform: process.platform,
+    pid: process.pid,
+    env: process.env.NODE_ENV || 'production'
+  }).catch(() => { });
 });

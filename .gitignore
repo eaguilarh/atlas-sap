@@ -1,67 +1,57 @@
-# Dependencies
-node_modules/
+# ============================================================
+# ATLAS · SAP Operations Suite — Git Ignore
+# ============================================================
 
-# Environment files - NEVER COMMIT
+# Secretos y variables de entorno críticas
 .env
 .env.*
 !.env.example
-!.env.ai.example
+secrets/
+certs/
+*.pem
+*.key
+*.crt
 
-# Local development
-*.local
-.DS_Store
-Thumbs.db
+# Dependencias y artefactos de compilación
+node_modules/
+.npm/
+dist/
+build/
+coverage/
+*.tsbuildinfo
 
-# Logs
+# Respaldos y dumps de bases de datos
+backups/
+*.sql.bak
+*.dump
+*.tar.gz
+*.sqlite
+*.db
+
+# Archivos de ofimática con datos operativos o confidenciales
+*.xlsx
+*.xlsm
+~$*.xlsx
+~$*.xlsm
+=
+
+# Logs del sistema
 logs/
 *.log
 npm-debug.log*
+pnpm-debug.log*
 
-# Test coverage
-coverage/
-.nyc_output/
+# Archivos temporales y de diagnóstico local
+scratch/
+local-env/
+graphify-out/
+*.tmp
+*.temp
 
-# Build artifacts
-dist/
-build/
-*.tsbuildinfo
-
-# IDE
+# Archivos del sistema operativo y editores
+.DS_Store
+Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker
-.docker/
-
-# Secrets (Docker secrets, etc.)
-secrets/
-
-# Backup files
-backups/
-*.bak
-*.backup
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Local tooling
-tqs-db.sh
-graphify-out/
-
-# Scratch/development files (clean up before commit)
-scratch_*.py
-scratch_*.js
-scratch_*.md
-scratch_*.txt
-
-# Database
-*.sqlite
-*.db

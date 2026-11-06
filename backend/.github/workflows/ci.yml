@@ -1,0 +1,33 @@
+name: Backend CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código Fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Verificación de Sintaxis de Server
+        run: node --check server.js
+
+      - name: Ejecutar Pruebas Automatizadas
+        run: node --test tests/api.test.js
+
+      - name: Probar Construcción Docker
+        run: docker build -t atlas-backend-ci:latest .
+
