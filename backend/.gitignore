@@ -28,6 +28,18 @@ backups/
 *.xlsm
 *.pdf
 
+# Archivos temporales y scripts de diagnóstico local
+*.cjs
+apply_db_fixes.js
+check_db_status.js
+atlas_n8n_workflows.json
+.eslintrc.*
+.prettierrc
+.hintrc
+scripts/import-excel-rfcs.js
+scripts/unlock_guadalupe.js
+tests/security.test.js
+
 # Archivos del sistema operativo y editores
 .DS_Store
 Thumbs.db

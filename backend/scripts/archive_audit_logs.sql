@@ -47,4 +47,3 @@ VACUUM ANALYZE public.log_auditoria;
 VACUUM ANALYZE public.log_actividades;
 VACUUM ANALYZE public.log_aplicacion;
 VACUUM ANALYZE public.log_sincronizacion;
-
