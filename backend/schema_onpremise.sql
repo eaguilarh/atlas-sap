@@ -482,3 +482,77 @@ CREATE TABLE IF NOT EXISTS public.ai_knowledge_gaps (
     resuelto BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+
+-- ============================================================
+-- 11. TRIGGER UNIVERSAL DE AUDITORÍA DE BASE DE DATOS
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.fn_atlas_audit_trigger()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_rec_id TEXT;
+  v_summary TEXT;
+  v_user_email TEXT;
+  v_old_data JSONB := NULL;
+  v_new_data JSONB := NULL;
+BEGIN
+  IF current_setting('atlas.api_logged', true) = 'true' THEN
+    IF (TG_OP = 'DELETE') THEN RETURN OLD; ELSE RETURN NEW; END IF;
+  END IF;
+
+  v_user_email := COALESCE(current_setting('atlas.current_user_email', true), CURRENT_USER);
+
+  IF (TG_OP = 'DELETE') THEN
+    v_old_data := to_jsonb(OLD);
+    v_rec_id := COALESCE(v_old_data->>'id', v_old_data->>'ticket', 'SIN_ID');
+    v_summary := 'Baja en tabla ' || TG_TABLE_NAME || ' (Registro: ' || v_rec_id || ')';
+
+    INSERT INTO public.log_actividades (fecha, usuario_email, entidad, entidad_id, accion, resumen, cambios)
+    VALUES (NOW(), v_user_email, TG_TABLE_NAME, v_rec_id, 'DB_DELETE', v_summary, jsonb_build_object('eliminado', v_old_data));
+    RETURN OLD;
+
+  ELSIF (TG_OP = 'UPDATE') THEN
+    v_old_data := to_jsonb(OLD);
+    v_new_data := to_jsonb(NEW);
+    v_rec_id := COALESCE(v_new_data->>'id', v_new_data->>'ticket', 'SIN_ID');
+    v_summary := 'Actualización en tabla ' || TG_TABLE_NAME || ' (Registro: ' || v_rec_id || ')';
+
+    IF (v_old_data IS DISTINCT FROM v_new_data) THEN
+      INSERT INTO public.log_actividades (fecha, usuario_email, entidad, entidad_id, accion, resumen, cambios)
+      VALUES (NOW(), v_user_email, TG_TABLE_NAME, v_rec_id, 'DB_UPDATE', v_summary, jsonb_build_object('anterior', v_old_data, 'nuevo', v_new_data));
+    END IF;
+    RETURN NEW;
+
+  ELSIF (TG_OP = 'INSERT') THEN
+    v_new_data := to_jsonb(NEW);
+    v_rec_id := COALESCE(v_new_data->>'id', v_new_data->>'ticket', 'SIN_ID');
+    v_summary := 'Alta en tabla ' || TG_TABLE_NAME || ' (Registro: ' || v_rec_id || ')';
+
+    INSERT INTO public.log_actividades (fecha, usuario_email, entidad, entidad_id, accion, resumen, cambios)
+    VALUES (NOW(), v_user_email, TG_TABLE_NAME, v_rec_id, 'DB_INSERT', v_summary, jsonb_build_object('creado', v_new_data));
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_audit_rfcs ON public.rfcs;
+CREATE TRIGGER trg_audit_rfcs
+  AFTER INSERT OR UPDATE OR DELETE ON public.rfcs
+  FOR EACH ROW EXECUTE FUNCTION public.fn_atlas_audit_trigger();
+
+DROP TRIGGER IF EXISTS trg_audit_solicitudes ON public.solicitudes;
+CREATE TRIGGER trg_audit_solicitudes
+  AFTER INSERT OR UPDATE OR DELETE ON public.solicitudes
+  FOR EACH ROW EXECUTE FUNCTION public.fn_atlas_audit_trigger();
+
+DROP TRIGGER IF EXISTS trg_audit_tqs_users ON public.tqs_users;
+CREATE TRIGGER trg_audit_tqs_users
+  AFTER INSERT OR UPDATE OR DELETE ON public.tqs_users
+  FOR EACH ROW EXECUTE FUNCTION public.fn_atlas_audit_trigger();
+
+DROP TRIGGER IF EXISTS trg_audit_sistemas ON public.sistemas;
+CREATE TRIGGER trg_audit_sistemas
+  AFTER INSERT OR UPDATE OR DELETE ON public.sistemas
+  FOR EACH ROW EXECUTE FUNCTION public.fn_atlas_audit_trigger();
