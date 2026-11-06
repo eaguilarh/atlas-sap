@@ -2,7 +2,7 @@
 
 Sistema integral de control de cambios (RFCs), gestión de operaciones SAP, matriz de responsabilidades TQS y gobierno de sistemas para EAS Consulting Group.
 
-- **Repositorio Oficial:** `https://github.com/eaguilarh01/atlas-sap`
+- **Repositorio Oficial:** `https://github.com/eaguilarh/atlas-sap`
 - **Versión:** 2.5.5
 - **Organización:** EAS Consulting Group
 - **Entorno de Producción:** Proxmox VE (Contenedores Docker: Nginx SSL Reverse Proxy, Node.js API, PostgreSQL 16)

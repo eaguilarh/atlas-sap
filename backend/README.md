@@ -2,7 +2,7 @@
 
 Servidor API REST, orquestación de base de datos PostgreSQL y proxy inverso de **ATLAS · SAP Operations & Management Suite**.
 
-- **Repositorio:** `https://github.com/eaguilarh/atlas-backend`
+- **Repositorio:** `https://github.com/eaguilarh/atlas-sap` (Directorio: `backend/`)
 - **Organización:** EAS Consulting Group
 - **Versión:** 2.5.5
 

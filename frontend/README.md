@@ -3,7 +3,7 @@
 Repositorio oficial del cliente web de **ATLAS · SAP Operations & Management Suite**.
 Arquitectura SPA (*Single Page Application*) desarrollada con tecnologías web estándar de alto rendimiento (HTML5, Vanilla JS, CSS3 con variables nativas).
 
-- **Repositorio:** `https://github.com/eaguilarh01/atlas-frontend`
+- **Repositorio:** `https://github.com/eaguilarh/atlas-sap` (Directorio: `frontend/`)
 - **Organización:** EAS Consulting Group
 - **Versión:** 2.5.5
 
