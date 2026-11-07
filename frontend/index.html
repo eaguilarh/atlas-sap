@@ -14534,9 +14534,9 @@ return Math.round((d - now) / 86400000);
 
 // ============================================================
 
-function getAlerts() {
+function getAlerts(sourceList) {
 
-const all = getAll();
+const all = Array.isArray(sourceList) ? sourceList : getAll();
 
 const alerts = [];
 
@@ -15094,7 +15094,7 @@ return sl.includes('cancel') || sl.includes('sin exito') || sl.includes('fall');
 
 }).length;
 
-const alertsList = getAlerts();
+const alertsList = getAlerts(all);
 const alerts = alertsList.length;
 const alertsUpcoming = alertsList.filter(a => a._days >= 0).length;
 const alertsOverdue = alertsList.filter(a => a._days < 0).length;
@@ -15175,7 +15175,7 @@ kpiGrid.innerHTML = `
 if (typeof checkGuardPermissions === 'function') checkGuardPermissions();
 
 // Dual Widgets: Finalizados (Izquierda) y Alertas (Derecha) - Ambos Colapsables
-const dashRecords = getAll();
+const dashRecords = all;
 const recentFinalizados = dashRecords.filter(r => {
   const sl = (r.status || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return sl.includes('finaliz') || sl.includes('exito') || sl.includes('sin exito') || sl.includes('fall') || sl.includes('complet');
@@ -15185,7 +15185,7 @@ const recentFinalizados = dashRecords.filter(r => {
   return dtB - dtA;
 }).slice(0, 5);
 
-const allAlertsList = getAlerts();
+const allAlertsList = alertsList;
 const alertsUpcomingCount = allAlertsList.filter(a => a._days >= 0).length;
 const alertsOverdueCount = allAlertsList.filter(a => a._days < 0).length;
 const alertsTotalCount = allAlertsList.length;
@@ -27993,6 +27993,7 @@ function switchAdminTqsView(viewType) {
     `;
   } else if (viewType === 'rfcs') {
     const tqsRfcs = allRecords.filter(r => {
+      if (r.owner_id && r.owner_id !== user.id) return false;
       const matchSys = userSistemas.some(s => (r.sistema_name || r._sheet || '').toLowerCase().includes(s));
       const matchOwner = r.owner_id === user.id || (Array.isArray(r.tqs_ids) && r.tqs_ids.includes(user.id));
       const matchProm = (r.promotor || '').toLowerCase().includes(user.nombre.toLowerCase());
@@ -28045,6 +28046,7 @@ function switchAdminTqsView(viewType) {
     `;
   } else if (viewType === 'desempeno') {
     const tqsRfcs = allRecords.filter(r => {
+      if (r.owner_id && r.owner_id !== user.id) return false;
       const matchSys = userSistemas.some(s => (r.sistema_name || r._sheet || '').toLowerCase().includes(s));
       const matchOwner = r.owner_id === user.id || (Array.isArray(r.tqs_ids) && r.tqs_ids.includes(user.id));
       return matchSys || matchOwner;
@@ -28087,6 +28089,7 @@ function filterTableByTqs(userId) {
   const userSistemas = (user.sistemas || []).map(s => s.toLowerCase().trim());
   const allRecords = getAll();
   const filtered = allRecords.filter(r => {
+    if (r.owner_id && r.owner_id !== user.id) return false;
     const matchSys = userSistemas.some(s => (r.sistema_name || r._sheet || '').toLowerCase().includes(s));
     const matchOwner = r.owner_id === user.id || (Array.isArray(r.tqs_ids) && r.tqs_ids.includes(user.id));
     const matchProm = (r.promotor || '').toLowerCase().includes(user.nombre.toLowerCase());
