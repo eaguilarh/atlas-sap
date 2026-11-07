@@ -626,11 +626,14 @@ const solicitudesInsertSchema = z.object({
   estatus: z.string().nullable().optional(),
   descripcion: z.string().nullable().optional(),
   titulo: z.string().nullable().optional(),
-  action_items: z.array(z.any()).nullable().optional(),
-  bitacora: z.array(z.any()).nullable().optional(),
-  estatus_historial: z.array(z.any()).nullable().optional(),
-  owner_id: z.string().uuid().nullable().optional(),
+  action_items: z.any().nullable().optional(),
+  bitacora: z.any().nullable().optional(),
+  estatus_historial: z.any().nullable().optional(),
+  owner_id: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
   tqs_ids: z.array(z.string().uuid()).nullable().optional(),
+  updated_at: z.string().optional(),
+  created_at: z.string().optional(),
+  deleted_at: z.string().nullable().optional(),
 });
 
 const sistemasInsertSchema = z.object({
@@ -1416,12 +1419,31 @@ const handleAdminUsers = async (req, res) => {
 app.post('/functions/v1/admin-users', authenticateToken, requireAuth, handleAdminUsers);
 app.post('/api/admin/users', authenticateToken, requireAuth, handleAdminUsers);
 
+const JSONB_COLUMNS = [
+  'action_items',
+  'bitacora',
+  'estatus_historial',
+  'raw_user_meta_data',
+  'request_info',
+  'detalles',
+  'cambios',
+  'preguntas_respuestas'
+];
+
 function formatValForPg(val, key) {
   if (val === null || val === undefined) return null;
-  if (Array.isArray(val)) {
-    if (['action_items', 'bitacora', 'raw_user_meta_data'].includes(key)) {
-      return JSON.stringify(val);
+  if (JSONB_COLUMNS.includes(key)) {
+    if (typeof val === 'string') {
+      try {
+        JSON.parse(val);
+        return val;
+      } catch {
+        return JSON.stringify(val);
+      }
     }
+    return JSON.stringify(val);
+  }
+  if (Array.isArray(val)) {
     return val;
   }
   if (typeof val === 'object') {
@@ -1646,6 +1668,14 @@ app.post('/rest/v1/:table', authenticateToken, requireAuth, async (req, res) => 
       if (r.hora_inicio !== undefined) r.hora_inicio = normalizeTimeString(r.hora_inicio);
       if (r.hora_fin !== undefined) r.hora_fin = normalizeTimeString(r.hora_fin);
       if (r.hora_fin_retorno !== undefined) r.hora_fin_retorno = normalizeTimeString(r.hora_fin_retorno);
+    }
+  }
+
+  if (table === 'solicitudes') {
+    for (const r of rows) {
+      if (!r.owner_id && req.user?.sub) {
+        r.owner_id = req.user.sub;
+      }
     }
   }
 

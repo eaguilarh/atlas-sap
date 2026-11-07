@@ -1539,6 +1539,7 @@ box-shadow:var(--shadow);white-space:nowrap;-webkit-backdrop-filter:blur(6px);ba
 #page-direccion .form-label{color:#7C90B4}
 
 @media(max-width:900px){.cine-grid{grid-template-columns:1fr}#page-direccion .kpi-grid{grid-template-columns:repeat(2,1fr)}.cine-trow{grid-template-columns:110px 1fr 46px}}
+@media(max-width:960px){.desempeno-export-grid{grid-template-columns:1fr !important;}}
 
 .cine-desc{font-size:11.5px;color:#8296B6;margin:1px 0 14px;line-height:1.4;max-width:72ch}
 
@@ -3646,7 +3647,7 @@ ATLAS IA COPILOT - FAB & DRAWER STYLES
 
 position: fixed;
 
-bottom: 24px;
+bottom: 90px;
 
 right: 24px;
 
@@ -3658,7 +3659,7 @@ align-items: center;
 
 gap: 10px;
 
-padding: 12px 20px;
+padding: 10px 18px;
 
 background: linear-gradient(135deg, #0090cc, #005599);
 
@@ -3668,21 +3669,41 @@ border-radius: 30px;
 
 font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
 
-font-size: 14px;
+font-size: 13.5px;
 
 font-weight: 600;
 
-cursor: pointer;
+cursor: grab;
 
 box-shadow: 0 8px 24px rgba(0, 144, 204, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
 
-transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 
-border: 1px solid rgba(255, 255, 255, 0.2);
+border: 1px solid rgba(255, 255, 255, 0.25);
 
 -webkit-user-select: none;
 
 user-select: none;
+
+touch-action: none;
+
+}
+
+.ai-copilot-fab:active {
+
+cursor: grabbing;
+
+}
+
+.ai-copilot-fab.is-dragging {
+
+cursor: grabbing !important;
+
+transition: none !important;
+
+opacity: 0.92;
+
+box-shadow: 0 14px 32px rgba(0, 144, 204, 0.6), 0 6px 16px rgba(0, 0, 0, 0.35);
 
 }
 
@@ -6229,7 +6250,6 @@ html, body {
   overflow-x: auto !important;
   overflow-y: visible !important;
   box-sizing: border-box !important;
-  -webkit-overflow-scrolling: touch !important;
 }
 
 .table-scroll table, table.data-table, table {
@@ -8519,6 +8539,8 @@ onclick="toggleTheme()"></button>
 
 <button class="btn btn-secondary btn-sm" id="btn-topbar-registro-user" onclick="showNewUserModal()" title="Registro de nuevo usuario"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg> <span>Registro de Usuario</span></button>
 
+<button class="btn btn-secondary btn-sm" id="btn-topbar-ai" onclick="toggleAiCopilotDrawer()" title="Abrir Atlas IA Copilot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg><span>Atlas IA</span></button>
+
 <button class="btn btn-secondary btn-sm" onclick="loadUserBackupRfcs()" title="Ver RFCs de mis sistemas y backup">Mis Sistemas & Backup</button>
 
 <button class="btn btn-secondary btn-sm" onclick="loadPromoterRfcs()" title="Ver RFCs promovidos por mí">Mis RFCs Promovidos</button>
@@ -8625,6 +8647,14 @@ sesión</button>
 
 <div class="flex-row flex-gap-10 align-center flex-wrap">
 
+<div class="date-range-badge" style="border: 1.5px solid var(--accent, #0090cc); background: rgba(0, 144, 204, 0.08);">
+<label for="dash-scope-filter" class="text-sm font-semibold" style="color:var(--accent2,#0f2b5c);">Vista</label>
+<select id="dash-scope-filter" class="btn-btn-ghost-clear" style="font-weight:700; color:var(--accent2,#0f2b5c);" aria-label="Filtro de vista TQS o General" title="Filtrar vista entre Operación General o TQS logueado" onchange="setDashboardScope(this.value)">
+<option value="general" selected>General (Toda la Operación)</option>
+<option value="tqs">Solo Mi Perfil TQS</option>
+</select>
+</div>
+
 <div class="date-range-badge">
 
 <label for="dash-criticidad-filter" class="text-sm text-muted font-semibold">Criticidad</label>
@@ -8700,24 +8730,7 @@ onclick="exportFilteredCSV()" title="Exportar registros filtrados a CSV">📥 Ex
 
 </div>
 
-<!-- PANEL DE SUPERVISIÓN PARA ADMINISTRADORES: SWITCH POR TQS (SISTEMAS, RFCS, SOLICITUDES, DESEMPEÑO) -->
-<div id="admin-tqs-supervisor-bar" class="admin-supervisor-bar" style="display:none; margin-bottom:18px; padding:12px 18px; background:var(--surface,#ffffff); border:1px solid var(--border,#cbd5e1); border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-      <span style="font-weight:700; font-size:13px; color:var(--accent2,#0f2b5c);">Supervisión de TQS:</span>
-      <select id="admin-tqs-supervisor-select" class="form-select form-control-sm" style="font-size:12.5px; padding:4px 10px; min-width:200px; border-radius:6px; font-weight:600;" onchange="selectAdminTqsFilter(this.value)">
-        <option value="ALL">Todos los TQS (Vista Global)</option>
-      </select>
-    </div>
-    <div id="admin-tqs-switch-buttons" style="display:flex; gap:6px; flex-wrap:wrap;">
-      <button type="button" class="btn btn-sm btn-primary active" id="btn-admin-switch-rfcs" onclick="switchAdminTqsView('rfcs')" title="Ver RFCs del TQS seleccionado">RFCs</button>
-      <button type="button" class="btn btn-sm btn-secondary" id="btn-admin-switch-sistemas" onclick="switchAdminTqsView('sistemas')" title="Ver Sistemas asignados al TQS">Sistemas</button>
-      <button type="button" class="btn btn-sm btn-secondary" id="btn-admin-switch-solicitudes" onclick="switchAdminTqsView('solicitudes')" title="Ver Solicitudes del TQS">Solicitudes</button>
-      <button type="button" class="btn btn-sm btn-secondary" id="btn-admin-switch-desempeno" onclick="switchAdminTqsView('desempeno')" title="Ver Avance y Desempeño Operativo">Desempeño y Avance</button>
-    </div>
-  </div>
-  <div id="admin-tqs-details-panel" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border,#cbd5e1); font-size:12.5px;"></div>
-</div>
+
 
 <div class="kpi-grid" id="kpi-grid"></div>
 
@@ -9081,20 +9094,14 @@ sube = mejor.</div>
 
 </div>
 
-<div class="cine-desc">Proporción de RFCs finalizados sin incidentes sobre el total. Meta interna: 95%.
+<div class="cine-desc">Proporción de RFCs finalizados sin incidentes sobre el total. Meta interna: 95%.</div>
 
-</div>
-
-<div class="cine-cv cine-cv-gauge"><canvas id="dir-gauge" height="200"></canvas>
-
-<div class="cine-center">
-
-<div class="big text-3xl font-bold" id="dir-gauge-num">0%</div>
-
-<div class="cap">Éxito</div>
-
-</div>
-
+<div class="cine-cv cine-cv-gauge" style="position:relative;width:100%;max-width:240px;margin:0 auto;height:160px;">
+  <canvas id="dir-gauge" height="160"></canvas>
+  <div class="cine-center" style="position:absolute;left:0;right:0;top:38px;bottom:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+    <div class="big" id="dir-gauge-num" style="font-size:32px;font-weight:800;color:var(--text);line-height:1;margin:0;">0%</div>
+    <div class="cap" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px;">Éxito</div>
+  </div>
 </div>
 
 </div>
@@ -9133,79 +9140,49 @@ sube = mejor.</div>
 
 </div>
 
-<div class="cine-card full">
+<div class="desempeno-export-grid" style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;margin-top:20px;align-items:start;">
 
-<div class="cine-h">
+  <!-- Desempeño por TQS -->
+  <div class="cine-card" style="margin-top:0;">
+    <div class="cine-h">
+      <h3>Desempeño por TQS</h3><span class="k">% de RFCs finalizados con éxito</span>
+    </div>
+    <div class="cine-desc">% de RFCs que cada líder finalizó con éxito. Barra más larga = mejor desempeño.</div>
+    <div id="direccion-tqs-chart"></div>
+    <details class="mt-12">
+      <summary class="details-summary-toggle">VER TABLA DE NÚMEROS EXACTOS</summary>
+      <div id="direccion-tqs-table" class="mt-10"></div>
+    </details>
+  </div>
 
-<h3>Desempeño por TQS</h3><span class="k">% de RFCs finalizados con éxito</span>
-
-</div>
-
-<div class="cine-desc">% de RFCs que cada líder finalizó con éxito. Barra más larga = mejor desempeño.</div>
-
-<div id="direccion-tqs-chart"></div>
-
-</div>
-
-<details class="mt-12">
-
-<summary class="details-summary-toggle">VER TABLA DE NÚMEROS EXACTOS</summary>
-
-<div id="direccion-tqs-table" class="mt-10"></div>
-
-</details>
-
-<div class="page-header mt-24 mb-12">
-
-<h1 class="page-header-title">Exportar CSV filtrado</h1>
-
-<button class="btn btn-ai btn-sm" onclick="openAiExecutiveReportModal()">
-
-<span>🤖 Generar Reporte Ejecutivo con Claude 3.5</span>
-
-</button>
-
-</div>
-
-<div class="filter-panel-box">
-
-<div class="flex-row flex-gap-24 flex-wrap">
-
-<div>
-
-<div class="form-label mb-6">Rango de fecha</div>
-
-<div class="date-range-badge">
-
-<label for="direccion-date-from" class="text-sm text-muted font-semibold">Desde</label>
-
-<input type="date" id="direccion-date-from" class="btn-btn-ghost-clear" aria-label="Fecha desde"
-
-title="Fecha desde">
-
-<label for="direccion-date-to" class="text-sm text-muted font-semibold">Hasta</label>
-
-<input type="date" id="direccion-date-to" class="btn-btn-ghost-clear" aria-label="Fecha hasta"
-
-title="Fecha hasta">
-
-</div>
-
-</div>
-
-<div class="flex-1 min-w-220">
-
-<div class="form-label mb-6">TQS (vacío = todos)</div>
-
-<div id="direccion-tqs-checklist" class="tqs-checklist-box"></div>
-
-</div>
-
-</div>
-
-<button class="btn btn-primary btn-sm mt-14" aria-label="Exportar CSV filtrado"
-
-onclick="exportDireccionCSV()">Exportar CSV</button>
+  <!-- Exportar CSV filtrado -->
+  <div class="cine-card" style="margin-top:0;">
+    <div class="cine-h" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <h3 style="margin:0;">Exportar CSV filtrado</h3>
+      <button class="btn btn-ai btn-sm" onclick="openAiExecutiveReportModal()" style="font-size:11px;padding:3px 9px;">
+        <span>Reporte Ejecutivo AI</span>
+      </button>
+    </div>
+    <div class="cine-desc">Extrae los RFCs ejecutados dentro del rango de fechas y filtros TQS seleccionados.</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px;">
+      <div>
+        <div class="form-label mb-6" style="font-size:12px;font-weight:600;color:var(--text2);">Rango de fecha</div>
+        <div class="date-range-badge" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface2);padding:6px 10px;border-radius:8px;border:1px solid var(--border);">
+          <label for="direccion-date-from" style="font-size:12px;color:var(--text3);font-weight:600;">Desde</label>
+          <input type="date" id="direccion-date-from" class="btn-btn-ghost-clear" aria-label="Fecha desde" title="Fecha desde" style="background:transparent;border:none;color:var(--text);font-family:var(--font);font-size:12px;cursor:pointer;">
+          <label for="direccion-date-to" style="font-size:12px;color:var(--text3);font-weight:600;">Hasta</label>
+          <input type="date" id="direccion-date-to" class="btn-btn-ghost-clear" aria-label="Fecha hasta" title="Fecha hasta" style="background:transparent;border:none;color:var(--text);font-family:var(--font);font-size:12px;cursor:pointer;">
+        </div>
+      </div>
+      <div>
+        <div class="form-label mb-6" style="font-size:12px;font-weight:600;color:var(--text2);">TQS (vacío = todos)</div>
+        <div id="direccion-tqs-checklist" class="tqs-checklist-box" style="max-height:160px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;"></div>
+      </div>
+      <div style="margin-top:6px;">
+        <button class="btn btn-primary btn-sm" aria-label="Exportar CSV filtrado" onclick="exportDireccionCSV()" style="width:100%;justify-content:center;padding:8px 16px;font-weight:600;">Descargar CSV Filtrado</button>
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -10227,13 +10204,7 @@ onclick="document.getElementById('modal-ai-report').classList.remove('open')">Ce
 
 <!-- BOTON FLOTANTE (FAB) Y DRAWER DE ATLAS IA COPILOT -->
 
-<div class="ai-copilot-fab" id="ai-copilot-fab" onclick="toggleAiCopilotDrawer()">
 
-<span class="ai-copilot-fab-icon">🤖</span>
-
-<span>Atlas IA Copilot</span>
-
-</div>
 
 <div class="ai-copilot-drawer" id="ai-copilot-drawer">
 
@@ -10252,6 +10223,8 @@ onclick="document.getElementById('modal-ai-report').classList.remove('open')">Ce
 </div>
 
 </div>
+
+<button class="btn btn-ghost btn-xs" onclick="resetAiFabPosition()" title="Restablecer posición del botón flotante" style="font-size:11px;color:var(--text3);margin-left:auto;margin-right:8px;padding:3px 8px;">Restablecer botón</button>
 
 <button class="ai-drawer-close" onclick="toggleAiCopilotDrawer()">✕</button>
 
@@ -10670,12 +10643,123 @@ const MOCK_SOLICITUDES_SEED = [];
 
 // ============================================================
 
+let _aiFabDragging = false;
+
+function initAiFabDraggable() {
+  const fab = document.getElementById('ai-copilot-fab');
+  if (!fab || fab._dragInitDone) return;
+  fab._dragInitDone = true;
+
+  try {
+    const saved = localStorage.getItem('atlas_ai_fab_pos');
+    if (saved) {
+      const pos = JSON.parse(saved);
+      if (typeof pos.top === 'number' && typeof pos.left === 'number') {
+        const maxTop = Math.max(10, window.innerHeight - 70);
+        const maxLeft = Math.max(10, window.innerWidth - 180);
+        fab.style.top = Math.min(Math.max(10, pos.top), maxTop) + 'px';
+        fab.style.left = Math.min(Math.max(10, pos.left), maxLeft) + 'px';
+        fab.style.bottom = 'auto';
+        fab.style.right = 'auto';
+      }
+    }
+  } catch (e) {
+    console.warn('Error restaurando posición de Atlas IA:', e);
+  }
+
+  let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+  let didMove = false;
+
+  const onPointerDown = (e) => {
+    if (e.button && e.button !== 0) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const rect = fab.getBoundingClientRect();
+    startX = clientX;
+    startY = clientY;
+    initialLeft = rect.left;
+    initialTop = rect.top;
+    didMove = false;
+    _aiFabDragging = false;
+
+    window.addEventListener('mousemove', onPointerMove, { passive: false });
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+  };
+
+  const onPointerMove = (e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+
+    if (!didMove && Math.hypot(dx, dy) > 5) {
+      didMove = true;
+      _aiFabDragging = true;
+      fab.classList.add('is-dragging');
+    }
+
+    if (didMove) {
+      if (e.cancelable) e.preventDefault();
+      let newLeft = initialLeft + dx;
+      let newTop = initialTop + dy;
+
+      const pad = 10;
+      const maxLeft = window.innerWidth - fab.offsetWidth - pad;
+      const maxTop = window.innerHeight - fab.offsetHeight - pad;
+
+      newLeft = Math.max(pad, Math.min(newLeft, maxLeft));
+      newTop = Math.max(pad, Math.min(newTop, maxTop));
+
+      fab.style.left = newLeft + 'px';
+      fab.style.top = newTop + 'px';
+      fab.style.bottom = 'auto';
+      fab.style.right = 'auto';
+    }
+  };
+
+  const onPointerUp = () => {
+    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('mouseup', onPointerUp);
+    window.removeEventListener('touchmove', onPointerMove);
+    window.removeEventListener('touchend', onPointerUp);
+
+    if (didMove) {
+      fab.classList.remove('is-dragging');
+      try {
+        const rect = fab.getBoundingClientRect();
+        localStorage.setItem('atlas_ai_fab_pos', JSON.stringify({
+          top: Math.round(rect.top),
+          left: Math.round(rect.left)
+        }));
+      } catch (e) {}
+      setTimeout(() => { _aiFabDragging = false; }, 120);
+    } else {
+      _aiFabDragging = false;
+    }
+  };
+
+  fab.addEventListener('mousedown', onPointerDown);
+  fab.addEventListener('touchstart', onPointerDown, { passive: true });
+}
+
+function resetAiFabPosition() {
+  const fab = document.getElementById('ai-copilot-fab');
+  if (!fab) return;
+  localStorage.removeItem('atlas_ai_fab_pos');
+  fab.style.top = 'auto';
+  fab.style.left = 'auto';
+  fab.style.bottom = '90px';
+  fab.style.right = '24px';
+  showToast('Posición de Atlas IA restablecida', 'info');
+}
+
 function toggleAiCopilotDrawer() {
-
-const drawer = document.getElementById('ai-copilot-drawer');
-
-if (drawer) drawer.classList.toggle('open');
-
+  if (_aiFabDragging) return;
+  const drawer = document.getElementById('ai-copilot-drawer');
+  if (drawer) drawer.classList.toggle('open');
 }
 
 let _aiChatHistory = [];
@@ -12425,6 +12509,10 @@ try {
 function isRfcOfCurrentUser(r) {
   if (!r) return false;
   if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) return true;
+  // Perfil Admin / Director: opera sobre toda la operación sin filtro individual TQS
+  if (CURRENT_USER.rol && ['admin', 'director'].includes(CURRENT_USER.rol)) {
+    return true;
+  }
   const uid = CURRENT_USER.id;
   const uName = (CURRENT_USER.nombre || '').toLowerCase().trim();
   const uEmail = (CURRENT_USER.email || '').toLowerCase().trim();
@@ -12463,6 +12551,11 @@ function isRfcOfCurrentUser(r) {
   if (userSys.length > 0) {
     const rSys = String(r.sistema_name || r.sistema || r.sistema_sap || r._sheet || '').toLowerCase().trim();
     if (rSys && userSys.some(s => rSys === s || rSys.includes(s) || s.includes(rSys))) {
+      // Protección de Titularidad: Si el RFC ya pertenece explícitamente a otro TQS Leader (owner_id distinto),
+      // NO apropiarlo en el perfil personal, preservando la cuota exacta de titularidad individual.
+      if (r.owner_id && uid && r.owner_id !== uid) {
+        return false;
+      }
       return true;
     }
   }
@@ -12471,9 +12564,45 @@ function isRfcOfCurrentUser(r) {
 }
 window.isRfcOfCurrentUser = isRfcOfCurrentUser;
 
+function isSolOfCurrentUser(s) {
+  if (!s) return false;
+  if (typeof CURRENT_USER === 'undefined' || !CURRENT_USER) return true;
+  if (CURRENT_USER.rol && ['admin', 'director'].includes(CURRENT_USER.rol)) return true;
+  const uid = CURRENT_USER.id;
+  const uName = (CURRENT_USER.nombre || '').toLowerCase().trim();
+  const userSys = Array.isArray(CURRENT_USER.sistemas) ? CURRENT_USER.sistemas.map(s => String(s || '').toLowerCase().trim()).filter(Boolean) : [];
+
+  if (uid && (s.responsable_id === uid || s.owner_id === uid || s.tqs_id === uid || (Array.isArray(s.tqs_ids) && s.tqs_ids.includes(uid)))) {
+    return true;
+  }
+  if (uName) {
+    const rTqs = String(s.responsable || s.responsable_tqs || s.tqs || '').toLowerCase().trim();
+    if (rTqs && (rTqs === uName || rTqs.includes(uName) || uName.includes(rTqs))) return true;
+    const creador = String(s.usuario_creador || s.creador || '').toLowerCase().trim();
+    if (creador && (creador === uName || creador.includes(uName) || uName.includes(creador))) return true;
+  }
+  if (userSys.length > 0) {
+    const sSys = String(s.sistema || s.sistema_sap || '').toLowerCase().trim();
+    const arrSys = Array.isArray(s.sistemas) ? s.sistemas.map(x => String(x || '').toLowerCase().trim()) : [];
+    if (sSys && userSys.some(u => sSys === u || sSys.includes(u) || u.includes(sSys))) {
+      if (s.responsable_id && uid && s.responsable_id !== uid) return false;
+      return true;
+    }
+    if (arrSys.some(x => userSys.some(u => x === u || x.includes(u) || u.includes(x)))) {
+      if (s.responsable_id && uid && s.responsable_id !== uid) return false;
+      return true;
+    }
+  }
+  return false;
+}
+window.isSolOfCurrentUser = isSolOfCurrentUser;
+
 function getAll() {
   const base = SB_RECORDS || [];
   if (window._sidebarRfcScope === 'tqs' && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+    if (CURRENT_USER.rol && ['admin', 'director'].includes(CURRENT_USER.rol)) {
+      return base;
+    }
     return base.filter(r => isRfcOfCurrentUser(r));
   }
   return base;
@@ -12487,12 +12616,27 @@ window.getAllRaw = getAllRaw;
 function setSidebarRfcScope(scope) {
   const validScope = scope === 'tqs' ? 'tqs' : 'todos';
   window._sidebarRfcScope = validScope;
+  window.isDashboardTqsActive = validScope === 'tqs';
   try {
     localStorage.setItem('atlas_sidebar_rfc_scope', validScope);
   } catch(e) {}
 
   const el = document.getElementById('sidebar-rfc-scope');
   if (el && el.value !== validScope) el.value = validScope;
+
+  const dashScopeSel = document.getElementById('dash-scope-filter');
+  if (dashScopeSel) dashScopeSel.value = validScope === 'tqs' ? 'tqs' : 'general';
+
+  const btnDashTqs = document.getElementById('btn-dashboard-tqs-toggle');
+  if (btnDashTqs) {
+    if (validScope === 'tqs') {
+      btnDashTqs.className = 'btn btn-primary btn-sm';
+      btnDashTqs.innerHTML = '✓ Dashboard TQS (Activo)';
+    } else {
+      btnDashTqs.className = 'btn btn-secondary btn-sm';
+      btnDashTqs.innerHTML = '👤 Dashboard TQS';
+    }
+  }
 
   const ind = document.getElementById('sidebar-scope-indicator');
   if (ind) {
@@ -12532,6 +12676,8 @@ function setSidebarRfcScope(scope) {
     renderFinalizadosPage();
   } else if (pageId === 'page-cancelados' && typeof renderCanceladosPage === 'function') {
     renderCanceladosPage();
+  } else if (pageId === 'page-solicitudes' && typeof solRenderList === 'function') {
+    solRenderList();
   } else if (pageId === 'page-sheet' && typeof applyFilters === 'function') {
     applyFilters();
   } else if (typeof renderDashboard === 'function') {
@@ -12540,14 +12686,25 @@ function setSidebarRfcScope(scope) {
 
   if (typeof showToast === 'function') {
     if (validScope === 'tqs') {
-      const uName = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.nombre) ? CURRENT_USER.nombre : 'Usuario';
-      showToast('Filtro TQS activado: mostrando solo RFCs de ' + uName, 'info');
+      const isAdm = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && ['admin', 'director'].includes(CURRENT_USER.rol);
+      if (isAdm) {
+        showToast('Perfil Administrador: Mostrando la operación completa (sin filtro individual TQS)', 'info');
+      } else {
+        const uName = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.nombre) ? CURRENT_USER.nombre : 'Usuario';
+        showToast('Filtro TQS activado: mostrando solo registros de ' + uName, 'info');
+      }
     } else {
-      showToast('Filtro general activado: mostrando todos los RFCs', 'info');
+      showToast('Filtro general activado: mostrando toda la operación', 'info');
     }
   }
 }
 window.setSidebarRfcScope = setSidebarRfcScope;
+
+function setDashboardScope(scope) {
+  const isTqs = scope === 'tqs';
+  setSidebarRfcScope(isTqs ? 'tqs' : 'todos');
+}
+window.setDashboardScope = setDashboardScope;
 
 function solToRecord(s) {
 
@@ -12774,8 +12931,143 @@ function getSheet(name) {
   });
 }
 
+
+// =========================================================================
+// MATRIZ OFICIAL DE CORRELACIÓN: SISTEMA -> COORDINADOR KOF
+// (Según matrices operativas SAP AZURE y SAP ON-PREMISE)
+// =========================================================================
+const SISTEMA_COORDINADOR_MAP = {
+  // SAP AZURE
+  'ads': 'Ulises Gutiérrez',
+  'grc': 'Daniel Ponce',
+  'mdg': 'Ulises Gutiérrez',
+  'mii': 'Germán Bravo',
+  's/4': 'Viridiana Cortizo',
+  's4': 'Viridiana Cortizo',
+  's/4hana': 'Viridiana Cortizo',
+  's4hana': 'Viridiana Cortizo',
+  'sld': 'Daniel Ponce',
+  'slt': 'Talía Rosas',
+  'solman': 'Ulises Gutiérrez',
+  'cloud connector': 'Viridiana Cortizo',
+  'btp': 'Rolando Sánchez',
+  'papm': 'Rolando Sánchez',
+  'btp / papm': 'Rolando Sánchez',
+  'cproc': 'Viridiana Cortizo',
+  'cproc / bot': 'Viridiana Cortizo',
+  'bot': 'Viridiana Cortizo',
+  'data staging': 'Viridiana Cortizo',
+  'data provisioning': 'Viridiana Cortizo',
+  'data lake': 'Viridiana Cortizo',
+  'dynatrace': 'Rolando Sánchez',
+  'dynatrace (kof)': 'Rolando Sánchez',
+  'mulesoft': 'Rolando Sánchez',
+  'ewm': 'Rolando Sánchez',
+  'scm': 'Rolando Sánchez',
+  'zscaler': 'Viridiana Cortizo',
+  'code profiler': 'Viridiana Cortizo',
+  'code profiler for sap': 'Viridiana Cortizo',
+  'cyberark': 'Daniel Ponce',
+  'sentinel': 'Daniel Ponce',
+  'mid server': 'Rolando Sánchez',
+  'sis': 'Rolando Sánchez',
+  'adm sap': 'Rolando Sánchez',
+  'sis / adm sap': 'Rolando Sánchez',
+  'autopassreset': 'Daniel Ponce',
+
+  // SAP ON-PREMISE
+  'r3': 'Ulises Gutiérrez',
+  'historicos': 'Ulises Gutiérrez',
+  'r3 / historicos': 'Ulises Gutiérrez',
+  'sistemas historicos': 'Ulises Gutiérrez',
+  'ecc': 'Viridiana Cortizo',
+  'ecc rap': 'Viridiana Cortizo',
+  'ecc rvp': 'Viridiana Cortizo',
+  'ecc rlp': 'Talía Rosas',
+  'ecc no productivos': 'Viridiana Cortizo',
+  'rap': 'Viridiana Cortizo',
+  'rvp': 'Viridiana Cortizo',
+  'rlp': 'Talía Rosas',
+  'crm': 'Ulises Gutiérrez',
+  'bw hana': 'Daniel Ponce',
+  'bw comercial': 'Daniel Ponce',
+  'bw hana comercial': 'Daniel Ponce',
+  'bw financiero': 'Talía Rosas',
+  'bw hana financiero': 'Talía Rosas',
+  'bi java sybase': 'Daniel Ponce',
+  'bi java': 'Daniel Ponce',
+  'ep': 'Daniel Ponce',
+  'portal': 'Daniel Ponce',
+  'km': 'Daniel Ponce',
+  'trex': 'Daniel Ponce',
+  'pi': 'Daniel Ponce',
+  'po': 'Daniel Ponce',
+  'nwdi': 'Ulises Gutiérrez',
+  'cas': 'Talía Rosas',
+  'bods': 'Germán Bravo',
+  'data services': 'Germán Bravo',
+  'bods (data services)': 'Germán Bravo',
+  'pcm': 'Ulises Gutiérrez',
+  'fim': 'Ulises Gutiérrez',
+  'epm bw': 'Talía Rosas',
+  'epm': 'Talía Rosas',
+  'wts': 'Viridiana Cortizo',
+  'restauraciones no ecc': 'Ulises Gutiérrez',
+  'qlik': 'Viridiana Cortizo',
+  'sap router': 'Viridiana Cortizo'
+};
+
+function autoSelectKofCoordinatorsForSistemas(sistemas, formType = 'rfc') {
+  if (!sistemas || !Array.isArray(sistemas)) return;
+  const coordsToSelect = new Set();
+
+  sistemas.forEach(sys => {
+    if (!sys) return;
+    const clean = String(sys).toLowerCase().replace(/^sap\s+/i, '').trim();
+    if (SISTEMA_COORDINADOR_MAP[clean]) {
+      coordsToSelect.add(SISTEMA_COORDINADOR_MAP[clean]);
+      return;
+    }
+    for (const key of Object.keys(SISTEMA_COORDINADOR_MAP)) {
+      if (clean.includes(key) || key.includes(clean)) {
+        coordsToSelect.add(SISTEMA_COORDINADOR_MAP[key]);
+        break;
+      }
+    }
+  });
+
+  if (formType === 'rfc') {
+    const kofCbs = document.querySelectorAll('#kof-checkboxes-container input.kof-checkbox-item, input.kof-checkbox-item');
+    if (kofCbs.length > 0) {
+      // Deseleccionar el coordinador anterior para no acumular selecciones pasadas y marcar SOLO el nuevo
+      kofCbs.forEach(cb => {
+        cb.checked = coordsToSelect.has(cb.value);
+      });
+      if (typeof window.updateKofSelectLabel === 'function') {
+        window.updateKofSelectLabel();
+      }
+    }
+  } else if (formType === 'solicitud') {
+    const solKofCbs = document.querySelectorAll('#sol-kof-checkboxes-container input.sol-kof-checkbox-item, input.sol-kof-checkbox-item');
+    if (solKofCbs.length > 0) {
+      // Deseleccionar el coordinador anterior en Solicitudes y marcar SOLO el nuevo
+      solKofCbs.forEach(cb => {
+        cb.checked = coordsToSelect.has(cb.value);
+      });
+      if (typeof window.syncSolKofSelectFromCheckboxes === 'function') {
+        window.syncSolKofSelectFromCheckboxes();
+      }
+    }
+  }
+}
+window.autoSelectKofCoordinatorsForSistemas = autoSelectKofCoordinatorsForSistemas;
+window.SISTEMA_COORDINADOR_MAP = SISTEMA_COORDINADOR_MAP;
+
 function updateRfcGrupoFromSistemas() {
   const checked = Array.from(document.querySelectorAll('#rfc-sistemas-container input[name="rfc-sistema-cb"]:checked')).map(cb => cb.value);
+  if (typeof autoSelectKofCoordinatorsForSistemas === 'function') {
+    autoSelectKofCoordinatorsForSistemas(checked, 'rfc');
+  }
   const grupoSel = document.getElementById('f-grupo');
   if (grupoSel) {
     if (checked.length > 0) {
@@ -14105,6 +14397,29 @@ return isNaN(d.getTime()) ? null : d;
 
 }
 
+function toIsoDateOnly(s) {
+  if (!s || s === 'N/A' || s === '-') return null;
+  let str = String(s).trim();
+  if (str.includes('T')) str = str.split('T')[0].trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) {
+    const day = m[1].padStart(2, '0');
+    const mon = m[2].padStart(2, '0');
+    const yr = m[3];
+    return `${yr}-${mon}-${day}`;
+  }
+  const d = typeof parseDate === 'function' ? parseDate(s) : new Date(str);
+  if (d && !isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${da}`;
+  }
+  return null;
+}
+window.toIsoDateOnly = toIsoDateOnly;
+
 function formatDate(s) {
 
 const d = parseDate(s);
@@ -14535,6 +14850,12 @@ function clearAllDashFilters() {
   if (critEl) critEl.value = '';
   const yearEl = document.getElementById('dash-year-filter');
   if (yearEl) yearEl.value = '';
+  const scopeEl = document.getElementById('dash-scope-filter');
+  if (scopeEl) scopeEl.value = 'general';
+  window.isDashboardTqsActive = false;
+  window._sidebarRfcScope = 'todos';
+  const sideScope = document.getElementById('sidebar-rfc-scope');
+  if (sideScope) sideScope.value = 'todos';
   _dashStatusFilter = '';
   renderDashboard();
   if (typeof showToast === 'function') showToast('Filtros del dashboard reiniciados', 'info');
@@ -14563,22 +14884,25 @@ return true;
 
 });
 
-if (from) data = data.filter(r => ((r.fecha || '').split('T')[0]) >= from);
-
-if (to) data = data.filter(r => ((r.fecha || '').split('T')[0]) <= to);
-
-if (window.isDashboardTqsActive && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
-  const userSys = Array.isArray(CURRENT_USER.sistemas) ? CURRENT_USER.sistemas.map(s => s.toLowerCase().trim()) : [];
-  const uid = CURRENT_USER.id;
-  const uName = (CURRENT_USER.nombre || '').toLowerCase().trim();
+const normFrom = from ? toIsoDateOnly(from) : null;
+const normTo = to ? toIsoDateOnly(to) : null;
+if (normFrom || normTo) {
   data = data.filter(r => {
-    const rSys = (r.sistema_name || r.sistema || r._sheet || '').toLowerCase().trim();
-    const isSys = userSys.some(s => rSys === s || rSys.includes(s) || s.includes(rSys));
-    const isOwner = r.owner_id === uid;
-    const isTqs = Array.isArray(r.tqs_ids) && r.tqs_ids.includes(uid);
-    const isPromoter = (r.promotor || '').toLowerCase().includes(uName);
-    return isSys || isOwner || isTqs || isPromoter;
+    const d = toIsoDateOnly(r.fecha);
+    if (!d) return false;
+    if (normFrom && d < normFrom) return false;
+    if (normTo && d > normTo) return false;
+    return true;
   });
+}
+
+const isTqsMode = window.isDashboardTqsActive || window._sidebarRfcScope === 'tqs';
+if (isTqsMode && typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+  if (CURRENT_USER.rol && ['admin', 'director'].includes(CURRENT_USER.rol)) {
+    // Para perfil admin/director, la información es idéntica a General (toda la operación)
+  } else {
+    data = data.filter(r => isRfcOfCurrentUser(r));
+  }
 }
 
 if (_dashStatusFilter) {
@@ -14670,7 +14994,18 @@ const critFilter = document.getElementById('dash-criticidad-filter')?.value || '
 
 const yearFilter = document.getElementById('dash-year-filter')?.value || '';
 
-const hasFilter = from || to || critFilter || yearFilter || _dashStatusFilter || window.isDashboardTqsActive;
+const isTqsMode = window.isDashboardTqsActive || window._sidebarRfcScope === 'tqs';
+const dashScopeSel = document.getElementById('dash-scope-filter');
+if (dashScopeSel) {
+  dashScopeSel.value = isTqsMode ? 'tqs' : 'general';
+}
+const btnDashTqs = document.getElementById('btn-dashboard-tqs-toggle');
+if (btnDashTqs) {
+  btnDashTqs.className = isTqsMode ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+  btnDashTqs.innerHTML = isTqsMode ? '✓ Dashboard TQS (Activo)' : '👤 Dashboard TQS';
+}
+
+const hasFilter = from || to || critFilter || yearFilter || _dashStatusFilter || isTqsMode;
 
 const statusLabels = {
   'exito': 'Finalizados con Éxito',
@@ -14685,11 +15020,19 @@ const totalTag = document.getElementById('dash-total-tag');
 if (totalTag) {
   if (hasFilter) {
     const parts = [];
+    if (isTqsMode) {
+      const isAdm = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && ['admin', 'director'].includes(CURRENT_USER.rol);
+      if (isAdm) {
+        parts.push(`Vista Admin: Operación Completa`);
+      } else {
+        const uName = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.nombre) ? CURRENT_USER.nombre : 'Logueado';
+        parts.push(`Perfil TQS: ${uName}`);
+      }
+    }
     if (yearFilter) parts.push(`Año ${yearFilter}`);
     if (from || to) parts.push(`${from || 'inicio'} a ${to || 'hoy'}`);
     if (critFilter) parts.push(`Criticidad ${critFilter}`);
     if (_dashStatusFilter) parts.push(statusLabels[_dashStatusFilter] || _dashStatusFilter);
-    if (window.isDashboardTqsActive) parts.push('Perfil TQS');
     totalTag.innerHTML = `${all.length} de ${totalAll} RFCs (${parts.join(' · ')}) <button class="btn btn-ghost btn-xs ml-6" onclick="clearAllDashFilters()" title="Limpiar todos los filtros" style="padding:1px 6px;font-size:10px;color:var(--accent)">✕ Limpiar</button>`;
   } else {
     totalTag.textContent = `${all.length} registros (Operación Completa)`;
@@ -15815,6 +16158,7 @@ function renderVoboPage() {
       <td style="font-size:11px;color:var(--text3)">${escapeHtml(r._sheet || '—')}</td>
       <td style="font-weight:600">${escapeHtml(r.sistema_name || r.sistema || '—')}</td>
       <td style="color:var(--text2)">${escapeHtml(r.promotor || '—')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escapeHtml(r.coordinador_kof || '—')}</td>
       <td><span class="badge badge-blue" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
       <td class="desc">${escapeHtml(r.descripcion || '—')}</td>
       <td style="font-size:11px;color:var(--text3)">${escapeHtml(r.observaciones || '—')}</td>
@@ -15845,6 +16189,7 @@ function renderVoboPage() {
               ${getVoboSortHeaderHTML('Sistema Hoja', '_sheet')}
               ${getVoboSortHeaderHTML('Sistema', 'sistema')}
               ${getVoboSortHeaderHTML('Promotor', 'promotor')}
+              ${getVoboSortHeaderHTML('Coordinador', 'coordinador_kof')}
               ${getVoboSortHeaderHTML('TQS', 'tqs')}
               ${getVoboSortHeaderHTML('Descripción', 'descripcion')}
               ${getVoboSortHeaderHTML('Observaciones', 'observaciones')}
@@ -15947,12 +16292,28 @@ function renderCanceladosPage() {
   }
 
   const rows = canceladosRecords.map((r) => {
+    // Normalizador de visualización para asegurar consistencia entre Coordinador KOF y Promotor
+    let coordVal = r.coordinador_kof || '';
+    let promVal = r.promotor || '';
+    const tqsLeaders = ['guadalupe arguelles', 'nancy dolores', 'carlos castillo', 'héctor medina', 'hector medina', 'iván jesús', 'ivan jesus'];
+    if (coordVal && tqsLeaders.some(t => coordVal.toLowerCase().includes(t))) {
+      const kofCoords = ['ulises', 'daniel', 'talía', 'talia', 'viridiana', 'rolando'];
+      if (promVal && kofCoords.some(k => promVal.toLowerCase().includes(k))) {
+        const tmp = coordVal;
+        coordVal = promVal;
+        promVal = tmp;
+      } else {
+        coordVal = 'Ulises Gutiérrez';
+      }
+    }
+
     return `<tr style="cursor:pointer" onclick="showDetail('${escapeHtml(r.ticket || '')}')" title="Ver detalle de RFC Cancelado ${escapeHtml(r.ticket || '')}" onmouseover="this.style.background='rgba(239,68,68,0.04)'" onmouseout="this.style.background=''">
       <td><span class="badge badge-red">${escapeHtml(r.status || 'Cancelado')}</span></td>
       <td class="mono" style="color:var(--red);font-weight:700">${escapeHtml(r.ticket || r.rfc_id || '—')}</td>
       <td style="white-space:nowrap;font-size:12px">${formatDate(r.fecha)}</td>
       <td style="font-weight:600">${escapeHtml(r.sistema_name || r.sistema || '—')}</td>
-      <td style="color:var(--text2)">${escapeHtml(r.promotor || '—')}</td>
+      <td style="color:var(--text2)">${escapeHtml(promVal || '—')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escapeHtml(coordVal || '—')}</td>
       <td><span class="badge badge-blue" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
       <td class="desc" style="color:var(--text2)">${escapeHtml(r.descripcion || '—')}</td>
       <td style="font-size:11px;color:var(--red);font-style:italic">${escapeHtml(r.observaciones || r.bitacora || 'RFC Cancelado')}</td>
@@ -15976,6 +16337,7 @@ function renderCanceladosPage() {
               ${getCanceladosSortHeaderHTML('Fecha', 'fecha')}
               ${getCanceladosSortHeaderHTML('Sistema', 'sistema')}
               ${getCanceladosSortHeaderHTML('Promotor', 'promotor')}
+              ${getCanceladosSortHeaderHTML('Coordinador', 'coordinador_kof')}
               ${getCanceladosSortHeaderHTML('TQS', 'tqs')}
               ${getCanceladosSortHeaderHTML('Descripción', 'descripcion')}
               ${getCanceladosSortHeaderHTML('Motivo de Cancelación / Bitácora', 'observaciones')}
@@ -16020,10 +16382,29 @@ function exportCanceladosCSV() {
   const cancelados = getAll().filter(r => (r.status || '').toLowerCase().includes('cancel'));
   if (cancelados.length === 0) return showToast('No hay RFCs cancelados para exportar', 'warning');
 
-  let csv = 'Ticket,Tipo,Sistema,Fecha,Promotor,Status,Descripcion,Observaciones\n';
-  cancelados.forEach(r => {
-    csv += `"${r.ticket || ''}","${r.tipo || ''}","${r.sistema || ''}","${r.fecha || ''}","${r.promotor || ''}","${r.status || ''}","${(r.descripcion || '').replace(/"/g, '""')}","${(r.observaciones || '').replace(/"/g, '""')}"\n`;
-  });
+  const headers = ['Ticket', 'Tipo', 'Sistema', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'HoraInicio', 'HoraFin', 'HoraFinRetorno', 'Promotor', 'Coordinador', 'TQS', 'Status', 'Descripcion', 'Observaciones'];
+  const rows = cancelados.map(r => [
+    r.ticket || '',
+    r.tipo || '',
+    r.sistema_name || r.sistema || '',
+    r.fecha || '',
+    r.fechaFin || r.fecha_fin || '',
+    r.fechaFinRetorno || r.fecha_fin_retorno || '',
+    r.horaInicio || r.hora_inicio || '',
+    r.horaFin || r.hora_fin || '',
+    r.horaFinRetorno || r.hora_fin_retorno || '',
+    r.promotor || '',
+    r.coordinador_kof || '',
+    (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : (r.tqs || '')),
+    r.status || '',
+    r.descripcion || '',
+    r.observaciones || r.bitacora || ''
+  ]);
+
+  const csv = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -16031,6 +16412,8 @@ function exportCanceladosCSV() {
   a.href = url;
   a.download = `ATLAS_RFCs_Cancelados_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exportando ' + cancelados.length + ' RFCs cancelados...', 'success');
 }
 
 // ============================================================
@@ -16145,6 +16528,7 @@ function renderEjecucionPage() {
       <td class="mono" style="white-space:nowrap;font-size:11px;color:var(--text2)">${escapeHtml(horaTxt)}</td>
       <td style="font-weight:600">${escapeHtml(r.sistema_name || r.sistema || '—')}</td>
       <td style="color:var(--text2)">${escapeHtml(r.promotor || '—')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escapeHtml(r.coordinador_kof || '—')}</td>
       <td><span class="badge badge-blue" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
       <td class="desc" style="color:var(--text2)">${escapeHtml(r.descripcion || '—')}</td>
       <td style="font-size:11px;color:var(--text3)">${escapeHtml(r.observaciones || r.bitacora || '—')}</td>
@@ -16174,6 +16558,7 @@ function renderEjecucionPage() {
               <th>Horario</th>
               ${getEjecucionSortHeaderHTML('Sistema', 'sistema')}
               ${getEjecucionSortHeaderHTML('Promotor', 'promotor')}
+              ${getEjecucionSortHeaderHTML('Coordinador', 'coordinador_kof')}
               ${getEjecucionSortHeaderHTML('TQS', 'tqs')}
               ${getEjecucionSortHeaderHTML('Descripción', 'descripcion')}
               ${getEjecucionSortHeaderHTML('Observaciones', 'observaciones')}
@@ -16207,10 +16592,29 @@ function exportEjecucionCSV() {
 
   if (ejecRecords.length === 0) return showToast('No hay RFCs en ejecución para exportar', 'warning');
 
-  let csv = 'Ticket,Tipo,Sistema,Fecha,HoraInicio,HoraFin,Promotor,TQS,Status,Descripcion,Observaciones\n';
-  ejecRecords.forEach(r => {
-    csv += `"${r.ticket || ''}","${r.tipo || ''}","${r.sistema_name || r.sistema || ''}","${r.fecha || ''}","${r.horaInicio || ''}","${r.horaFin || ''}","${r.promotor || ''}","${formatTqsDisplay(r)}","${r.status || ''}","${(r.descripcion || '').replace(/"/g, '""')}","${(r.observaciones || '').replace(/"/g, '""')}"\n`;
-  });
+  const headers = ['Ticket', 'Tipo', 'Sistema', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'HoraInicio', 'HoraFin', 'HoraFinRetorno', 'Promotor', 'Coordinador', 'TQS', 'Status', 'Descripcion', 'Observaciones'];
+  const rows = ejecRecords.map(r => [
+    r.ticket || '',
+    r.tipo || '',
+    r.sistema_name || r.sistema || '',
+    r.fecha || '',
+    r.fechaFin || r.fecha_fin || '',
+    r.fechaFinRetorno || r.fecha_fin_retorno || '',
+    r.horaInicio || r.hora_inicio || '',
+    r.horaFin || r.hora_fin || '',
+    r.horaFinRetorno || r.hora_fin_retorno || '',
+    r.promotor || '',
+    r.coordinador_kof || '',
+    (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : (r.tqs || '')),
+    r.status || '',
+    r.descripcion || '',
+    r.observaciones || r.bitacora || ''
+  ]);
+
+  const csv = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -16218,6 +16622,8 @@ function exportEjecucionCSV() {
   a.href = url;
   a.download = `ATLAS_RFCs_En_Ejecucion_${todayStr}.csv`;
   a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exportando ' + ejecRecords.length + ' RFCs en ejecución...', 'success');
 }
 
 // ============================================================
@@ -16319,6 +16725,7 @@ function renderAprobadosPage() {
       <td class="mono" style="white-space:nowrap;font-size:11px;color:var(--text2)">${escapeHtml(horaTxt)}</td>
       <td style="font-weight:600">${escapeHtml(r.sistema_name || r.sistema || '—')}</td>
       <td style="color:var(--text2)">${escapeHtml(r.promotor || '—')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escapeHtml(r.coordinador_kof || '—')}</td>
       <td><span class="badge badge-blue" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
       <td class="desc" style="color:var(--text2)">${escapeHtml(r.descripcion || '—')}</td>
       <td style="font-size:11px;color:var(--text3)">${escapeHtml(r.observaciones || r.bitacora || '—')}</td>
@@ -16348,6 +16755,7 @@ function renderAprobadosPage() {
               <th>Horario</th>
               ${getAprobadosSortHeaderHTML('Sistema', 'sistema')}
               ${getAprobadosSortHeaderHTML('Promotor', 'promotor')}
+              ${getAprobadosSortHeaderHTML('Coordinador', 'coordinador_kof')}
               ${getAprobadosSortHeaderHTML('TQS', 'tqs')}
               ${getAprobadosSortHeaderHTML('Descripción', 'descripcion')}
               ${getAprobadosSortHeaderHTML('Observaciones', 'observaciones')}
@@ -16370,10 +16778,29 @@ function exportAprobadosCSV() {
 
   if (aprobRecords.length === 0) return showToast('No hay RFCs aprobados para exportar', 'warning');
 
-  let csv = 'Ticket,Tipo,Sistema,Fecha,HoraInicio,HoraFin,Promotor,TQS,Status,Descripcion,Observaciones\n';
-  aprobRecords.forEach(r => {
-    csv += `"${r.ticket || ''}","${r.tipo || ''}","${r.sistema_name || r.sistema || ''}","${r.fecha || ''}","${r.horaInicio || ''}","${r.horaFin || ''}","${r.promotor || ''}","${formatTqsDisplay(r)}","${r.status || ''}","${(r.descripcion || '').replace(/"/g, '""')}","${(r.observaciones || '').replace(/"/g, '""')}"\n`;
-  });
+  const headers = ['Ticket', 'Tipo', 'Sistema', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'HoraInicio', 'HoraFin', 'HoraFinRetorno', 'Promotor', 'Coordinador', 'TQS', 'Status', 'Descripcion', 'Observaciones'];
+  const rows = aprobRecords.map(r => [
+    r.ticket || '',
+    r.tipo || '',
+    r.sistema_name || r.sistema || '',
+    r.fecha || '',
+    r.fechaFin || r.fecha_fin || '',
+    r.fechaFinRetorno || r.fecha_fin_retorno || '',
+    r.horaInicio || r.hora_inicio || '',
+    r.horaFin || r.hora_fin || '',
+    r.horaFinRetorno || r.hora_fin_retorno || '',
+    r.promotor || '',
+    r.coordinador_kof || '',
+    (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : (r.tqs || '')),
+    r.status || '',
+    r.descripcion || '',
+    r.observaciones || ''
+  ]);
+
+  const csv = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -16381,6 +16808,8 @@ function exportAprobadosCSV() {
   a.href = url;
   a.download = `ATLAS_RFCs_Aprobados_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exportando ' + aprobRecords.length + ' RFCs aprobados...', 'success');
 }
 
 function quickSetRfcStatus(ticket, id, newStatus) {
@@ -16556,6 +16985,7 @@ function renderFinalizadosPage() {
       <td class="mono" style="white-space:nowrap;font-size:11px;color:var(--text2)">${escapeHtml(horaTxt)}</td>
       <td style="font-weight:600">${escapeHtml(r.sistema_name || r.sistema || '—')}</td>
       <td style="color:var(--text2)">${escapeHtml(r.promotor || '—')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escapeHtml(r.coordinador_kof || '—')}</td>
       <td><span class="badge badge-blue" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
       <td class="desc" style="color:var(--text2)">${escapeHtml(r.descripcion || '—')}</td>
       <td style="min-width:140px;">${clientApprovalHtml}</td>
@@ -16585,6 +17015,7 @@ function renderFinalizadosPage() {
               <th>Horario</th>
               ${getFinalizadosSortHeaderHTML('Sistema', 'sistema')}
               ${getFinalizadosSortHeaderHTML('Promotor', 'promotor')}
+              ${getFinalizadosSortHeaderHTML('Coordinador', 'coordinador_kof')}
               ${getFinalizadosSortHeaderHTML('TQS', 'tqs')}
               ${getFinalizadosSortHeaderHTML('Descripción', 'descripcion')}
               ${getFinalizadosSortHeaderHTML('Aprobado por Cliente', 'aprobado_cliente')}
@@ -16607,13 +17038,32 @@ function exportFinalizadosCSV() {
 
   if (finRecords.length === 0) return showToast('No hay RFCs finalizados para exportar', 'warning');
 
-  let csv = 'Ticket,Tipo,Sistema,Fecha,HoraInicio,HoraFin,Promotor,TQS,Status,AprobadoPorCliente,AprobadorCliente,FechaAprobacionCliente,Descripcion,Observaciones\n';
-  finRecords.forEach(r => {
-    const aprobCliente = r.aprobado_por_cliente ? 'SI' : 'NO';
-    const aprobNombre = (r.aprobado_por_cliente_nombre || '').replace(/"/g, '""');
-    const aprobFecha = (r.aprobado_por_cliente_fecha || '').replace(/"/g, '""');
-    csv += `"${r.ticket || ''}","${r.tipo || ''}","${r.sistema_name || r.sistema || ''}","${r.fecha || ''}","${r.horaInicio || ''}","${r.horaFin || ''}","${r.promotor || ''}","${formatTqsDisplay(r)}","${r.status || ''}","${aprobCliente}","${aprobNombre}","${aprobFecha}","${(r.descripcion || '').replace(/"/g, '""')}","${(r.observaciones || '').replace(/"/g, '""')}"\n`;
-  });
+  const headers = ['Ticket', 'Tipo', 'Sistema', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'HoraInicio', 'HoraFin', 'HoraFinRetorno', 'Promotor', 'Coordinador', 'TQS', 'Status', 'AprobadoPorCliente', 'AprobadorCliente', 'FechaAprobacionCliente', 'Descripcion', 'Observaciones'];
+  const rows = finRecords.map(r => [
+    r.ticket || '',
+    r.tipo || '',
+    r.sistema_name || r.sistema || '',
+    r.fecha || '',
+    r.fechaFin || r.fecha_fin || '',
+    r.fechaFinRetorno || r.fecha_fin_retorno || '',
+    r.horaInicio || r.hora_inicio || '',
+    r.horaFin || r.hora_fin || '',
+    r.horaFinRetorno || r.hora_fin_retorno || '',
+    r.promotor || '',
+    r.coordinador_kof || '',
+    (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : (r.tqs || '')),
+    r.status || '',
+    r.aprobado_por_cliente ? 'SI' : 'NO',
+    r.aprobado_por_cliente_nombre || '',
+    r.aprobado_por_cliente_fecha || '',
+    r.descripcion || '',
+    r.observaciones || r.bitacora || ''
+  ]);
+
+  const csv = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -16621,6 +17071,8 @@ function exportFinalizadosCSV() {
   a.href = url;
   a.download = `ATLAS_RFCs_Finalizados_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exportando ' + finRecords.length + ' RFCs finalizados...', 'success');
 }
 
 // ============================================================
@@ -17060,6 +17512,7 @@ function renderAlertsPage() {
       <td style="white-space:nowrap;font-size:12px">${formatDate(a.fecha)}</td>
       <td style="font-weight:600">${escapeHtml(a.sistema || a.sistema_name || '—')}</td>
       <td style="color:var(--text2)">${escapeHtml(a.promotor || '—')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escapeHtml(a.coordinador_kof || '—')}</td>
       <td><span class="badge badge-blue" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(formatTqsDisplay(a))}</span></td>
       <td><span class="badge badge-yellow" style="font-size:11px; font-weight:600; white-space:nowrap; padding:3px 8px;">${escapeHtml(a.status || 'En espera de VOBO')}</span></td>
       <td class="desc">${escapeHtml(a.descripcion || '—')}</td>
@@ -17091,6 +17544,7 @@ function renderAlertsPage() {
               ${getAlertsSortHeaderHTML('Fecha', 'fecha')}
               ${getAlertsSortHeaderHTML('Sistema', 'sistema')}
               ${getAlertsSortHeaderHTML('Promotor', 'promotor')}
+              ${getAlertsSortHeaderHTML('Coordinador', 'coordinador_kof')}
               ${getAlertsSortHeaderHTML('TQS', 'tqs')}
               ${getAlertsSortHeaderHTML('Estatus', 'status')}
               ${getAlertsSortHeaderHTML('Descripción', 'descripcion')}
@@ -17128,9 +17582,11 @@ const COLUMNS = [
 
 { key: 'sistema', label: 'Sistema', filterable: true, sortable: true },
 
-{ key: 'tqs', label: 'TQS Leader', filterable: true, sortable: true },
-
 { key: 'promotor', label: 'Promotor', filterable: true, sortable: true },
+
+{ key: 'coordinador_kof', label: 'Coordinador', filterable: true, sortable: true },
+
+{ key: 'tqs', label: 'TQS Leader', filterable: true, sortable: true },
 
 { key: 'descripcion', label: 'Descripción', filterable: false, sortable: false },
 
@@ -17735,7 +18191,7 @@ if (slice.length === 0) {
     </div>`;
   }
 
-  tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state" style="padding:48px 24px;text-align:center;"><div style="width:48px;height:48px;margin:0 auto 12px;border-radius:50%;background:rgba(16,50,104,0.06);display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text3,#64748b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div><p style="font-weight:600;color:var(--text);font-size:14px;margin:0 0 6px;">${emptyMsg}</p><p style="font-size:12px;color:var(--text3);margin:0;">Ajusta la búsqueda o restablece los filtros para ver más resultados.</p>${emptyAction}</div></td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="16"><div class="empty-state" style="padding:48px 24px;text-align:center;"><div style="width:48px;height:48px;margin:0 auto 12px;border-radius:50%;background:rgba(16,50,104,0.06);display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text3,#64748b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div><p style="font-weight:600;color:var(--text);font-size:14px;margin:0 0 6px;">${emptyMsg}</p><p style="font-size:12px;color:var(--text3);margin:0;">Ajusta la búsqueda o restablece los filtros para ver más resultados.</p>${emptyAction}</div></td></tr>`;
 
   const pagEl = document.getElementById('pagination');
   if (pagEl) pagEl.innerHTML = '';
@@ -17762,9 +18218,11 @@ return `<tr style="cursor:pointer;transition:background 0.15s" onclick="if (!eve
 
 <td style="font-weight:600;color:var(--text)">${escapeHtml(r.sistema || r.sistema_name || '—')}</td>
 
-<td><span class="badge badge-blue" style="font-size:11px;font-weight:600;white-space:nowrap;padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
-
 <td style="color:var(--text2)">${escapeHtml(r.promotor || '—')}</td>
+
+<td style="color:var(--text2);font-size:12px;">${escapeHtml(r.coordinador_kof || '—')}</td>
+
+<td><span class="badge badge-blue" style="font-size:11px;font-weight:600;white-space:nowrap;padding:3px 8px;">${escapeHtml(formatTqsDisplay(r))}</span></td>
 
 <td class="desc">${escapeHtml(r.descripcion || '—')}</td>
 
@@ -17790,7 +18248,7 @@ return `<tr style="cursor:pointer;transition:background 0.15s" onclick="if (!eve
 
 console.error('Error al renderizar tabla:', err);
 
-tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><p style="color:var(--red)">Error al renderizar registros: ${escapeHtml(err.message)}</p></div></td></tr>`;
+tbody.innerHTML = `<tr><td colspan="16"><div class="empty-state"><p style="color:var(--red)">Error al renderizar registros: ${escapeHtml(err.message)}</p></div></td></tr>`;
 
 }
 
@@ -20125,27 +20583,47 @@ submitBtn.textContent = `Reintentar Importación (${toImport.length})`;
 // ============================================================
 
 function exportVOBOcsv() {
+  const records = getAll().filter(r => {
+    if ((r._sheet || '').startsWith('Infra')) return false;
+    const sl = (r.status || '').toLowerCase();
+    return sl.includes('espera') || sl.includes('vobo');
+  });
 
-const records = getAll().filter(r => {
+  const headers = ['Tipo', 'Ambiente', 'Ticket', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'HoraInicio', 'HoraFin', 'HoraFinRetorno', 'Sistema', 'Promotor', 'Coordinador', 'TQS', 'Status', 'Descripcion', 'Observaciones', 'Hoja'];
 
-if ((r._sheet || '').startsWith('Infra')) return false;
+  const rows = records.map(r => [
+    r.tipo || '',
+    r.ambiente || '',
+    r.ticket || '',
+    r.fecha || '',
+    r.fechaFin || r.fecha_fin || '',
+    r.fechaFinRetorno || r.fecha_fin_retorno || '',
+    r.horaInicio || r.hora_inicio || '',
+    r.horaFin || r.hora_fin || '',
+    r.horaFinRetorno || r.hora_fin_retorno || '',
+    r.sistema_name || r.sistema || '',
+    r.promotor || '',
+    r.coordinador_kof || '',
+    (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : (r.tqs || '')),
+    r.status || '',
+    r.descripcion || '',
+    r.observaciones || '',
+    r._sheet || ''
+  ]);
 
-const sl = (r.status || '').toLowerCase();
+  const csv = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
 
-return sl.includes('espera') || sl.includes('vobo');
-
-});
-
-const keys = ['_sheet', 'tipo', 'ticket', 'fecha', 'sistema', 'promotor', 'descripcion', 'status', 'observaciones', 'horaInicio', 'horaFin', 'horaFinRetorno'];
-
-const csv = [keys.join(','), ...records.map(r => keys.map(k => `"${(r[k] || '').toString().replace(/"/g, '""')}"`).join(','))].join('\n');
-
-const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-
-a.download = 'RFCs_En_Espera_VOBO_' + new Date().toISOString().slice(0, 10) + '.csv';
-
-a.click();
-
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'RFCs_En_Espera_VOBO_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exportando ' + records.length + ' RFCs en espera de VOBO...', 'success');
 }
 
 function exportCSV() {
@@ -20162,25 +20640,41 @@ doExport(filteredData.length ? filteredData : getSheet(currentSheet), 'TQS_' + c
 
 function doExport(data, filename) {
 
-const headers = ['Tipo', 'Ambiente', 'Ticket', 'Fecha', 'Sistema', 'Promotor', 'Descripcion', 'Observaciones', 'Status', 'HoraInicio', 'HoraFin', 'Hoja'];
+  const headers = ['Tipo', 'Ambiente', 'Ticket', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'HoraInicio', 'HoraFin', 'HoraFinRetorno', 'Sistema', 'Promotor', 'Coordinador', 'TQS', 'Status', 'Descripcion', 'Observaciones', 'Hoja'];
 
-const keys = ['tipo', 'ambiente', 'ticket', 'fecha', 'sistema', 'promotor', 'descripcion', 'observaciones', 'status', 'horaInicio', 'horaFin', 'horaFinRetorno', '_sheet'];
+  const rows = data.map(r => [
+    r.tipo || '',
+    r.ambiente || '',
+    r.ticket || '',
+    r.fecha || '',
+    r.fechaFin || r.fecha_fin || '',
+    r.fechaFinRetorno || r.fecha_fin_retorno || '',
+    r.horaInicio || r.hora_inicio || '',
+    r.horaFin || r.hora_fin || '',
+    r.horaFinRetorno || r.hora_fin_retorno || '',
+    r.sistema_name || r.sistema || '',
+    r.promotor || '',
+    r.coordinador_kof || '',
+    (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : (r.tqs || '')),
+    r.status || '',
+    r.descripcion || '',
+    r.observaciones || '',
+    r._sheet || ''
+  ]);
 
-const csv = [headers.join(','),
+  const csv = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
 
-...data.map(r => keys.map(k => '"' + (r[k] || '').toString().replace(/"/g, '""') + '"').join(','))
-
-].join('\n');
-
-const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-
-const url = URL.createObjectURL(blob);
-
-const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-
-URL.revokeObjectURL(url);
-
-toast('Exportando ' + data.length + ' registros…', 'success');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exportando ' + data.length + ' registros...', 'success');
 
 }
 
@@ -20781,7 +21275,10 @@ document.querySelector('.app')?.classList.remove('hidden');
 
 const fab = document.getElementById('ai-copilot-fab');
 
-if (fab) fab.style.display = 'flex';
+if (fab) {
+  fab.style.display = 'flex';
+  if (typeof initAiFabDraggable === 'function') initAiFabDraggable();
+}
 
 }
 
@@ -21924,7 +22421,8 @@ if (user.id) {
 
 try {
 
-const ownedSys = await sbRequest('GET', `sistemas?or=(owner_id.eq.${user.id},backup_id.eq.${user.id})&select=nombre`);
+// Consultar exclusivamente los sistemas donde el usuario es titular directo (owner_id)
+const ownedSys = await sbRequest('GET', `sistemas?owner_id=eq.${user.id}&select=nombre`);
 
 if (Array.isArray(ownedSys)) {
 
@@ -21938,6 +22436,12 @@ sistemasSet.add(normalizeSapSystemName(s.nombre.trim()));
 
 });
 
+}
+
+// Almacenar sistemas de backup en propiedad independiente para contingencias sin contaminar titularidad
+const backupSys = await sbRequest('GET', `sistemas?backup_id=eq.${user.id}&select=nombre`);
+if (Array.isArray(backupSys)) {
+  user.sistemas_backup = backupSys.map(s => normalizeSapSystemName(s.nombre || '')).filter(Boolean);
 }
 
 } catch (errOwned) {
@@ -23130,6 +23634,9 @@ function syncSolTqsSelectFromCheckboxes() {
 function clearSolTqsSelection() {
   document.querySelectorAll('input[name="sol-tqs-cb"]').forEach(cb => { cb.checked = false; });
   syncSolTqsSelectFromCheckboxes();
+  if (typeof autoSelectKofCoordinatorsForSistemas === 'function') {
+    autoSelectKofCoordinatorsForSistemas(checkedSistemas, 'solicitud');
+  }
 }
 
 function filterMultiSelectSolTqs(query) {
@@ -23468,6 +23975,9 @@ function solRenderList() {
   let data = SOL_RECORDS.filter(s => {
     if (filterTipo && s.tipo !== filterTipo) return false;
     if (filterEst && s.estatus !== filterEst) return false;
+    if (window._sidebarRfcScope === 'tqs' && typeof CURRENT_USER !== 'undefined' && CURRENT_USER && !['admin', 'director'].includes(CURRENT_USER.rol)) {
+      if (typeof isSolOfCurrentUser === 'function' && !isSolOfCurrentUser(s)) return false;
+    }
     return true;
   });
 
@@ -23500,7 +24010,10 @@ function solRenderList() {
         <span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:auto">${fechaStr}</span>
       </div>
       <div style="font-size:13px;color:var(--text);margin-bottom:6px;font-weight:500">${escapeHtml(s.descripcion?.substring(0, 120) || '—')}${(s.descripcion || '').length > 120 ? '…' : ''}</div>
-      <div style="margin-bottom:6px;"><span class="badge badge-blue" style="font-size:11px; padding:2px 8px; font-weight:600;">TQS: ${escapeHtml(s.responsable || s.tqs || 'Sin asignar')}</span></div>
+      <div style="margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span class="badge badge-blue" style="font-size:11px; padding:2px 8px; font-weight:600;">TQS: ${escapeHtml(s.responsable || s.tqs || 'Sin asignar')}</span>
+        ${s.coordinador_kof ? `<span class="badge" style="font-size:11px; padding:2px 8px; font-weight:600; background:rgba(255,255,255,0.06); border:1px solid var(--border);">Coord: ${escapeHtml(s.coordinador_kof)}</span>` : ''}
+      </div>
       <div style="display:flex;gap:12px;font-family:var(--mono);font-size:10px;color:var(--text3)">
         ${s.sistema_sap ? `<span>${escapeHtml(s.sistema_sap)}</span>` : ''}
         ${s.ambiente ? `<span>Amb: ${escapeHtml(s.ambiente)}</span>` : ''}
@@ -24356,30 +24869,82 @@ return { xl: B.map(b => b.l), vol: B.map(b => b.tot), suc: B.map(b => b.tot ? Ma
 
 function _dirTip() { let el = document.getElementById('dir-tip'); if (!el) { el = document.createElement('div'); el.id = 'dir-tip'; el.className = 'cine-tip'; document.body.appendChild(el); } return el; }
 
+function _calcNiceAxis(rawMax) {
+  rawMax = Math.max(1, rawMax || 1);
+  if (rawMax <= 4) {
+    return { axisMax: 4, tickStep: 1, ticks: [0, 1, 2, 3, 4] };
+  }
+  if (rawMax <= 8) {
+    return { axisMax: 8, tickStep: 2, ticks: [0, 2, 4, 6, 8] };
+  }
+  const rawStep = (rawMax * 1.15) / 4;
+  const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const frac = rawStep / pow;
+  let niceNorm = 1;
+  if (frac > 5) niceNorm = 10;
+  else if (frac > 2) niceNorm = 5;
+  else if (frac > 1) niceNorm = 2;
+  const tickStep = Math.max(1, Math.ceil(niceNorm * pow));
+  const axisMax = tickStep * 4;
+  return { axisMax, tickStep, ticks: [0, tickStep, tickStep * 2, tickStep * 3, axisMax] };
+}
+
 function renderDirGauge(exito, total) {
+  const cv = document.getElementById('dir-gauge');
+  if (!cv) return;
+  const val = total > 0 ? Math.round(exito / total * 100) : 0;
+  const t0 = performance.now();
+  const num = document.getElementById('dir-gauge-num');
 
-const cv = document.getElementById('dir-gauge'); if (!cv) return; const val = total > 0 ? Math.round(exito / total * 100) : 0;
+  (function f(t) {
+    const p = _dirRM() ? 1 : Math.min(1, (t - t0) / 1100);
+    const { c, w, h } = _dirFit(cv, 160);
+    const cx = w / 2;
+    const cy = h * 0.78;
+    const r = Math.min(w * 0.38, h * 0.58);
+    const A0 = Math.PI * 0.85;
+    const A1 = Math.PI * 2.15;
+    c.clearRect(0, 0, w, h);
+    c.lineCap = 'round';
 
-const t0 = performance.now(); const num = document.getElementById('dir-gauge-num');
+    c.strokeStyle = 'rgba(120,160,220,.14)';
+    c.lineWidth = 14;
+    c.beginPath();
+    c.arc(cx, cy, r, A0, A1);
+    c.stroke();
 
-(function f(t) {
+    const cur = A0 + (A1 - A0) * (val / 100) * _dirEase(p);
+    const g = c.createLinearGradient(cx - r, 0, cx + r, 0);
+    g.addColorStop(0, '#0284C7');
+    g.addColorStop(1, '#10B981');
+    c.save();
+    if (!_dirRM()) {
+      c.shadowColor = 'rgba(2,132,199,.4)';
+      c.shadowBlur = 14;
+    }
+    c.strokeStyle = g;
+    c.lineWidth = 14;
+    c.beginPath();
+    c.arc(cx, cy, r, A0, cur);
+    c.stroke();
+    c.restore();
 
-const p = _dirRM() ? 1 : Math.min(1, (t - t0) / 1100); const { c, w, h } = _dirFit(cv, 200);
+    if (val > 0) {
+      c.save();
+      if (!_dirRM()) {
+        c.shadowColor = '#10B981';
+        c.shadowBlur = 10;
+      }
+      c.fillStyle = '#10B981';
+      c.beginPath();
+      c.arc(cx + Math.cos(cur) * r, cy + Math.sin(cur) * r, 6.5, 0, 7);
+      c.fill();
+      c.restore();
+    }
 
-const cx = w / 2, cy = h * 0.92, r = Math.min(w, h * 1.7) / 2 - 16, A0 = Math.PI * 0.75, A1 = Math.PI * 2.25; c.clearRect(0, 0, w, h); c.lineCap = 'round';
-
-c.strokeStyle = 'rgba(120,160,220,.12)'; c.lineWidth = 14; c.beginPath(); c.arc(cx, cy, r, A0, A1); c.stroke();
-
-const cur = A0 + (A1 - A0) * (val / 100) * _dirEase(p); const g = c.createLinearGradient(cx - r, 0, cx + r, 0); g.addColorStop(0, '#00BEFE'); g.addColorStop(1, '#7CE06B');
-
-c.save(); if (!_dirRM()) { c.shadowColor = 'rgba(0,190,254,.6)'; c.shadowBlur = 18; } c.strokeStyle = g; c.lineWidth = 14; c.beginPath(); c.arc(cx, cy, r, A0, cur); c.stroke(); c.restore();
-
-c.save(); if (!_dirRM()) { c.shadowColor = '#7CE06B'; c.shadowBlur = 14; } c.fillStyle = '#7CE06B'; c.beginPath(); c.arc(cx + Math.cos(cur) * r, cy + Math.sin(cur) * r, 6.5, 0, 7); c.fill(); c.restore();
-
-if (num) num.textContent = Math.round(val * _dirEase(p)) + '%'; if (p < 1) requestAnimationFrame(f);
-
-})(performance.now());
-
+    if (num) num.textContent = Math.round(val * _dirEase(p)) + '%';
+    if (p < 1) requestAnimationFrame(f);
+  })(performance.now());
 }
 
 // ============================================================
@@ -24389,48 +24954,101 @@ function _trunc(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '
 function _roundRect(c, x, y, w, h, r) { r = Math.max(0, Math.min(r, w / 2, h / 2)); c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 
 function cineVBars(cv, S) {
+  if (!cv) return;
+  const t0 = performance.now();
+  cv._S = S;
+  if (cv._hv == null) cv._hv = -1;
+  const LH = +(cv.dataset.h || (cv.dataset.h = cv.getAttribute('height') || '330'));
 
-if (!cv) return; const t0 = performance.now(); cv._S = S; if (cv._hv == null) cv._hv = -1;
+  function draw(prog) {
+    const n = S.vol.length;
+    const { c, w, h } = _dirFit(cv, LH);
+    const padL = 38, padR = 16, padT = 22, padB = 38, DEP = 13, pw = w - padL - padR, ph = h - padT - padB, base = padT + ph;
+    const { axisMax, ticks } = _calcNiceAxis(Math.max(...S.vol));
+    const step = pw / Math.max(1, n), bw = Math.min(46, step * 0.52);
+    c.clearRect(0, 0, w, h);
 
-const LH = +(cv.dataset.h || (cv.dataset.h = cv.getAttribute('height') || '330'));
+    const mono = getComputedStyle(document.body).getPropertyValue('--mono');
+    const sans = getComputedStyle(document.body).getPropertyValue('--font');
+    const textMuted = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#64748B';
+    const borderColor = getComputedStyle(document.body).getPropertyValue('--border').trim() || 'rgba(120,160,220,.15)';
 
-function draw(prog) {
+    c.strokeStyle = borderColor;
+    c.lineWidth = 1;
+    c.fillStyle = textMuted;
+    c.font = '11px ' + mono;
+    c.textAlign = 'right';
 
-const n = S.vol.length; const { c, w, h } = _dirFit(cv, LH);
+    for (let g = 0; g <= 4; g++) {
+      const gy = base - (g / 4) * ph;
+      c.beginPath();
+      c.moveTo(padL, gy);
+      c.lineTo(padL + pw, gy);
+      c.stroke();
+      c.fillText(ticks[g], padL - 8, gy + 4);
+    }
 
-const padL = 38, padR = 16, padT = 22, padB = 38, DEP = 13, pw = w - padL - padR, ph = h - padT - padB, base = padT + ph;
+    c.strokeStyle = borderColor;
+    for (let i = 0; i <= n; i++) {
+      const x = padL + step * i;
+      c.beginPath();
+      c.moveTo(x, base);
+      c.lineTo(x + DEP, base - DEP);
+      c.stroke();
+    }
+    c.beginPath();
+    c.moveTo(padL + DEP, base - DEP);
+    c.lineTo(padL + pw + DEP, base - DEP);
+    c.stroke();
 
-const max = Math.max(1, ...S.vol) * 1.18, step = pw / Math.max(1, n), bw = Math.min(46, step * 0.52); c.clearRect(0, 0, w, h);
+    S.vol.forEach((v, i) => {
+      const bx = padL + step * i + (step - bw) / 2;
+      const fh = (v / axisMax) * ph * (_dirRM() ? 1 : Math.min(1, prog * 1.4 - i * 0.04));
+      const H = Math.max(0, fh), top = base - H, hot = i === cv._hv;
 
-const mono = getComputedStyle(document.body).getPropertyValue('--mono'), sans = getComputedStyle(document.body).getPropertyValue('--font');
+      // 3D Side
+      c.fillStyle = hot ? '#1D4ED8' : '#1E3A8A';
+      c.beginPath();
+      c.moveTo(bx + bw, top);
+      c.lineTo(bx + bw + DEP, top - DEP);
+      c.lineTo(bx + bw + DEP, base - DEP);
+      c.lineTo(bx + bw, base);
+      c.closePath();
+      c.fill();
 
-const textMuted = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#64748B';
+      // 3D Top
+      c.fillStyle = hot ? '#93C5FD' : '#60A5FA';
+      c.beginPath();
+      c.moveTo(bx, top);
+      c.lineTo(bx + bw, top);
+      c.lineTo(bx + bw + DEP, top - DEP);
+      c.lineTo(bx + DEP, top - DEP);
+      c.closePath();
+      c.fill();
 
-const borderColor = getComputedStyle(document.body).getPropertyValue('--border').trim() || 'rgba(120,160,220,.15)';
+      // Front Face
+      const g = c.createLinearGradient(0, top, 0, base);
+      if (hot) {
+        g.addColorStop(0, '#60A5FA');
+        g.addColorStop(0.5, '#3B82F6');
+        g.addColorStop(1, '#1D4ED8');
+      } else {
+        g.addColorStop(0, '#3B82F6');
+        g.addColorStop(0.5, '#2563EB');
+        g.addColorStop(1, '#1E40AF');
+      }
+      c.save();
+      if (!_dirRM()) {
+        c.shadowColor = 'rgba(37,99,235,.25)';
+        c.shadowBlur = hot ? 18 : 8;
+      }
+      c.fillStyle = g;
+      c.fillRect(bx, top, bw, H);
+      c.restore();
 
-c.strokeStyle = borderColor; c.lineWidth = 1; c.fillStyle = textMuted; c.font = '11px ' + mono; c.textAlign = 'right';
-
-for (let g = 0; g <= 4; g++) { const gy = base - (g / 4) * ph; c.beginPath(); c.moveTo(padL, gy); c.lineTo(padL + pw, gy); c.stroke(); c.fillText(Math.round(max * g / 4), padL - 8, gy + 4); }
-
-c.strokeStyle = borderColor; for (let i = 0; i <= n; i++) { const x = padL + step * i; c.beginPath(); c.moveTo(x, base); c.lineTo(x + DEP, base - DEP); c.stroke(); }
-
-c.beginPath(); c.moveTo(padL + DEP, base - DEP); c.lineTo(padL + pw + DEP, base - DEP); c.stroke();
-
-S.vol.forEach((v, i) => {
-
-const bx = padL + step * i + (step - bw) / 2; const fh = (v / max) * ph * (_dirRM() ? 1 : Math.min(1, prog * 1.4 - i * 0.04)); const H = Math.max(0, fh), top = base - H, hot = i === cv._hv;
-
-c.fillStyle = hot ? 'rgba(180,60,20,.95)' : 'rgba(120,40,14,.9)'; c.beginPath(); c.moveTo(bx + bw, top); c.lineTo(bx + bw + DEP, top - DEP); c.lineTo(bx + bw + DEP, base - DEP); c.lineTo(bx + bw, base); c.closePath(); c.fill();
-
-c.fillStyle = hot ? '#93C5FD' : '#60A5FA'; c.beginPath(); c.moveTo(bx, top); c.lineTo(bx + bw, top); c.lineTo(bx + bw + DEP, top - DEP); c.lineTo(bx + DEP, top - DEP); c.closePath(); c.fill();
-
-const g = c.createLinearGradient(0, top, 0, base); g.addColorStop(0, '#3B82F6'); g.addColorStop(.5, '#2563EB'); g.addColorStop(1, '#1E3A8A');
-
-c.save(); if (!_dirRM()) { c.shadowColor = 'rgba(37,99,235,.25)'; c.shadowBlur = hot ? 20 : 10; } c.fillStyle = g; c.fillRect(bx, top, bw, H); c.restore();
-
-c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx, top, bw, 1.5);
-
-});
+      c.fillStyle = 'rgba(255,255,255,.45)';
+      c.fillRect(bx, top, bw, 1.5);
+    });
 
 if (S.suc) {
 
@@ -24950,43 +25568,138 @@ const S = dirSeries(_dirRecords, _dirRange); const n = S.vol.length; const { c, 
 
 const padL = 38, padR = 16, padT = 24, padB = 38, DEP = 13, pw = w - padL - padR, ph = h - padT - padB, base = padT + ph;
 
-const max = Math.max(1, ...S.vol) * 1.18, step = pw / Math.max(1, n), bw = Math.min(46, step * 0.52);
+const { axisMax, ticks } = _calcNiceAxis(Math.max(...S.vol));
+const step = pw / Math.max(1, n), bw = Math.min(46, step * 0.52);
 
-c.clearRect(0, 0, w, h); const mono = getComputedStyle(document.body).getPropertyValue('--mono'); const sans = getComputedStyle(document.body).getPropertyValue('--font');
+c.clearRect(0, 0, w, h);
+const mono = getComputedStyle(document.body).getPropertyValue('--mono');
+const sans = getComputedStyle(document.body).getPropertyValue('--font');
+const textMuted = getComputedStyle(document.body).getPropertyValue('--text2').trim() || '#64748B';
+const borderColor = getComputedStyle(document.body).getPropertyValue('--border').trim() || 'rgba(120,160,220,.15)';
 
-c.strokeStyle = 'rgba(120,160,220,.09)'; c.lineWidth = 1; c.fillStyle = 'rgba(157,180,214,.5)'; c.font = '11px ' + mono; c.textAlign = 'right';
+c.strokeStyle = borderColor;
+c.lineWidth = 1;
+c.fillStyle = textMuted;
+c.font = '11px ' + mono;
+c.textAlign = 'right';
 
-for (let g = 0; g <= 4; g++) { const gy = base - (g / 4) * ph; c.beginPath(); c.moveTo(padL, gy); c.lineTo(padL + pw, gy); c.stroke(); c.fillText(Math.round(max * g / 4), padL - 8, gy + 4); }
+for (let g = 0; g <= 4; g++) {
+  const gy = base - (g / 4) * ph;
+  c.beginPath();
+  c.moveTo(padL, gy);
+  c.lineTo(padL + pw, gy);
+  c.stroke();
+  c.fillText(ticks[g], padL - 8, gy + 4);
+}
 
-c.strokeStyle = 'rgba(120,160,220,.06)'; for (let i = 0; i <= n; i++) { const x = padL + step * i; c.beginPath(); c.moveTo(x, base); c.lineTo(x + DEP, base - DEP); c.stroke(); }
-
-c.beginPath(); c.moveTo(padL + DEP, base - DEP); c.lineTo(padL + pw + DEP, base - DEP); c.stroke();
+c.strokeStyle = borderColor;
+for (let i = 0; i <= n; i++) {
+  const x = padL + step * i;
+  c.beginPath();
+  c.moveTo(x, base);
+  c.lineTo(x + DEP, base - DEP);
+  c.stroke();
+}
+c.beginPath();
+c.moveTo(padL + DEP, base - DEP);
+c.lineTo(padL + pw + DEP, base - DEP);
+c.stroke();
 
 S.vol.forEach((v, i) => {
+  const bx = padL + step * i + (step - bw) / 2;
+  const fh = (v / axisMax) * ph * (_dirRM() ? 1 : Math.min(1, prog * 1.4 - i * 0.04));
+  const H = Math.max(0, fh), top = base - H, hot = i === _dirBarHover;
 
-const bx = padL + step * i + (step - bw) / 2; const fh = (v / max) * ph * (_dirRM() ? 1 : Math.min(1, prog * 1.4 - i * 0.04)); const H = Math.max(0, fh), top = base - H, hot = i === _dirBarHover;
+  // 3D Side face
+  c.fillStyle = hot ? '#1D4ED8' : '#1E3A8A';
+  c.beginPath();
+  c.moveTo(bx + bw, top);
+  c.lineTo(bx + bw + DEP, top - DEP);
+  c.lineTo(bx + bw + DEP, base - DEP);
+  c.lineTo(bx + bw, base);
+  c.closePath();
+  c.fill();
 
-c.fillStyle = hot ? 'rgba(180,60,20,.95)' : 'rgba(120,40,14,.9)'; c.beginPath(); c.moveTo(bx + bw, top); c.lineTo(bx + bw + DEP, top - DEP); c.lineTo(bx + bw + DEP, base - DEP); c.lineTo(bx + bw, base); c.closePath(); c.fill();
+  // 3D Top face
+  c.fillStyle = hot ? '#93C5FD' : '#60A5FA';
+  c.beginPath();
+  c.moveTo(bx, top);
+  c.lineTo(bx + bw, top);
+  c.lineTo(bx + bw + DEP, top - DEP);
+  c.lineTo(bx + DEP, top - DEP);
+  c.closePath();
+  c.fill();
 
-c.fillStyle = hot ? '#FFE39A' : '#FFCF7C'; c.beginPath(); c.moveTo(bx, top); c.lineTo(bx + bw, top); c.lineTo(bx + bw + DEP, top - DEP); c.lineTo(bx + DEP, top - DEP); c.closePath(); c.fill();
+  // Front face (vibrant modern blue gradient, completely opaque)
+  const g = c.createLinearGradient(0, top, 0, base);
+  if (hot) {
+    g.addColorStop(0, '#60A5FA');
+    g.addColorStop(0.5, '#3B82F6');
+    g.addColorStop(1, '#1D4ED8');
+  } else {
+    g.addColorStop(0, '#3B82F6');
+    g.addColorStop(0.5, '#2563EB');
+    g.addColorStop(1, '#1E40AF');
+  }
+  c.save();
+  if (!_dirRM()) {
+    c.shadowColor = 'rgba(37,99,235,.25)';
+    c.shadowBlur = hot ? 18 : 8;
+  }
+  c.fillStyle = g;
+  c.fillRect(bx, top, bw, H);
+  c.restore();
 
-c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx, top, bw, 1.5);
-
+  c.fillStyle = 'rgba(255,255,255,.45)';
+  c.fillRect(bx, top, bw, 1.5);
 });
 
 const tp = _dirRM() ? 1 : Math.min(1, Math.max(0, (prog - 0.25) / 0.75));
+const pts = S.suc.map((s, i) => [padL + step * i + step / 2, padT + ph - (s / 100) * ph * 0.9]);
+const dn = Math.max(1, Math.floor(pts.length * tp));
 
-const pts = S.suc.map((s, i) => [padL + step * i + step / 2, padT + ph - (s / 100) * ph * 0.9]); const dn = Math.max(1, Math.floor(pts.length * tp));
+c.save();
+c.lineJoin = 'round';
+c.lineCap = 'round';
+if (!_dirRM()) {
+  c.shadowColor = 'rgba(16,185,129,.5)';
+  c.shadowBlur = 14;
+}
+c.strokeStyle = '#10B981';
+c.lineWidth = 2.6;
+c.beginPath();
+pts.slice(0, dn).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]));
+c.stroke();
+c.restore();
 
-c.save(); c.lineJoin = 'round'; c.lineCap = 'round'; if (!_dirRM()) { c.shadowColor = 'rgba(70,230,200,.8)'; c.shadowBlur = 16; } c.strokeStyle = '#5CF0D6'; c.lineWidth = 2.6; c.beginPath();
+pts.slice(0, dn).forEach(p => {
+  c.save();
+  if (!_dirRM()) {
+    c.shadowColor = '#10B981';
+    c.shadowBlur = 10;
+  }
+  c.fillStyle = '#ffffff';
+  c.beginPath();
+  c.arc(p[0], p[1], 4.5, 0, 7);
+  c.fill();
+  c.lineWidth = 2.2;
+  c.strokeStyle = '#10B981';
+  c.stroke();
+  c.restore();
+});
 
-pts.slice(0, dn).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke(); c.restore();
+c.fillStyle = textMuted;
+c.font = '600 11px ' + sans;
+c.textAlign = 'center';
+S.xl.forEach((x, i) => c.fillText(x, padL + step * i + step / 2, base + 22));
 
-pts.slice(0, dn).forEach(p => { c.save(); if (!_dirRM()) { c.shadowColor = '#7CFFE6'; c.shadowBlur = 12; } c.fillStyle = '#0A1526'; c.beginPath(); c.arc(p[0], p[1], 4.5, 0, 7); c.fill(); c.lineWidth = 2.2; c.strokeStyle = '#7CFFE6'; c.stroke(); c.restore(); });
-
-c.fillStyle = 'rgba(157,180,214,.75)'; c.font = '11px ' + sans; c.textAlign = 'center'; S.xl.forEach((x, i) => c.fillText(x, padL + step * i + step / 2, base + 22));
-
-if (_dirBarHover >= 0 && _dirBarHover < n) { const i = _dirBarHover, bx = padL + step * i + (step - bw) / 2, H = (S.vol[i] / max) * ph; c.fillStyle = '#fff'; c.font = '700 13px ' + mono; c.textAlign = 'center'; c.fillText(S.vol[i], bx + bw / 2, base - H - DEP - 8); }
+if (_dirBarHover >= 0 && _dirBarHover < n) {
+  const i = _dirBarHover, bx = padL + step * i + (step - bw) / 2, H = (S.vol[i] / axisMax) * ph;
+  c.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#fff';
+  c.font = '700 13px ' + mono;
+  c.textAlign = 'center';
+  c.fillText(S.vol[i], bx + bw / 2, base - H - DEP - 8);
+}
 
 return S;
 
@@ -25312,11 +26025,30 @@ const selectedIds = Array.from(document.querySelectorAll('input[name="direccion-
 
 let records = getAll();
 
-if (dateFrom) records = records.filter(r => (r.fecha || '') >= dateFrom);
+const normFrom = dateFrom ? toIsoDateOnly(dateFrom) : null;
+const normTo = dateTo ? toIsoDateOnly(dateTo) : null;
 
-if (dateTo) records = records.filter(r => (r.fecha || '') <= dateTo);
+if (normFrom || normTo) {
+  records = records.filter(r => {
+    const d = toIsoDateOnly(r.fecha);
+    if (!d) return false;
+    if (normFrom && d < normFrom) return false;
+    if (normTo && d > normTo) return false;
+    return true;
+  });
+}
 
-if (selectedIds.length > 0) records = records.filter(r => selectedIds.includes(r.owner_id));
+if (selectedIds.length > 0) {
+  const selectedUsers = (_direccionTqsList || []).filter(u => selectedIds.includes(String(u.id)));
+  const selectedNames = selectedUsers.map(u => (u.nombre || '').toLowerCase().trim());
+  records = records.filter(r => {
+    if (selectedIds.includes(String(r.owner_id))) return true;
+    if (Array.isArray(r.tqs_ids) && r.tqs_ids.some(id => selectedIds.includes(String(id)))) return true;
+    const rTqs = (r.tqs || r.responsable || '').toLowerCase();
+    if (selectedNames.some(nm => nm && rTqs.includes(nm))) return true;
+    return false;
+  });
+}
 
 if (records.length === 0) {
 
@@ -25332,7 +26064,7 @@ const nombreById = {};
 
 const escape = v => `"${(v || '').toString().replace(/"/g, '""')}"`;
 
-const headers = ['Sistema', 'Tipo', 'Ticket', 'Fecha', 'SID', 'TQS / Dueño', 'Promotor', 'Descripción', 'Status', 'Observaciones'];
+const headers = ['Sistema', 'Tipo', 'Ticket', 'FechaInicio', 'FechaFin', 'FechaRetorno', 'SID', 'Coordinador', 'TQS / Dueño', 'Promotor', 'Descripción', 'Status', 'Observaciones'];
 
 const rows = [headers.join(',')];
 
@@ -25348,9 +26080,15 @@ escape(r.ticket),
 
 escape(r.fecha),
 
+escape(r.fechaFin || r.fecha_fin),
+
+escape(r.fechaFinRetorno || r.fecha_fin_retorno),
+
 escape(r.sistema),
 
-escape(nombreById[r.owner_id] || 'Sin asignar'),
+escape(r.coordinador_kof),
+
+escape(nombreById[r.owner_id] || (typeof formatTqsDisplay === 'function' ? formatTqsDisplay(r) : 'Sin asignar')),
 
 escape(r.promotor),
 
@@ -26910,7 +27648,6 @@ html, body {
   overflow-x: auto !important;
   overflow-y: visible !important;
   box-sizing: border-box !important;
-  -webkit-overflow-scrolling: touch !important;
 }
 
 .table-scroll table, table.data-table, table {
@@ -27191,27 +27928,8 @@ window._adminSupervisorActiveView = 'rfcs';
 
 async function initAdminTqsSupervisor() {
   const bar = document.getElementById('admin-tqs-supervisor-bar');
-  if (!bar) return;
-  const isAdmin = CURRENT_USER && (CURRENT_USER.rol === 'admin' || CURRENT_USER.rol === 'director');
-  if (!isAdmin) {
-    bar.style.display = 'none';
-    return;
-  }
-  bar.style.display = 'block';
-
-  const sel = document.getElementById('admin-tqs-supervisor-select');
-  if (!sel) return;
-
-  try {
-    let tqsList = await sbRequest('GET', 'tqs_users?rol=in.(admin,tqs_leader)&activo=eq.true&select=id,nombre,sistemas&order=nombre.asc') || [];
-    tqsList = (tqsList || []).filter(u => typeof isExcludedTqsUser === 'function' ? !isExcludedTqsUser(u) : true);
-    window._adminTqsUsersList = tqsList;
-
-    sel.innerHTML = '<option value="ALL">Todos los TQS (Vista Global)</option>' +
-      tqsList.map(u => `<option value="${u.id}">${escapeHtml(u.nombre)} (${(u.sistemas || []).length} sistemas)</option>`).join('');
-  } catch (e) {
-    console.warn('Error loading admin supervisor TQS list:', e);
-  }
+  if (bar) bar.style.display = 'none';
+  return;
 }
 
 function selectAdminTqsFilter(tqsId) {
@@ -30164,12 +30882,24 @@ async function parseEmailFile(file, formType) {
         detectedCoordinators.push(coord);
       }
     }
-    // Mapeo automático de Coordinador KOF si el sistema detectado tiene coordinador asignado
+    // Mapeo automático de Coordinador KOF según matriz oficial
     if (detectedCoordinators.length === 0 && detectedSystems.length > 0) {
-      const sysUpper = detectedSystems.map(s => s.toUpperCase());
-      if (sysUpper.includes('CRM') || sysUpper.includes('MII')) detectedCoordinators.push('Germán Bravo');
-      else if (sysUpper.includes('PI') || sysUpper.includes('PO') || sysUpper.includes('ADS')) detectedCoordinators.push('Ulises Gutiérrez');
-      else if (sysUpper.includes('DATA SERVICES') || sysUpper.includes('BODS')) detectedCoordinators.push('Daniel Ponce');
+      detectedSystems.forEach(ds => {
+        const clean = String(ds).toLowerCase().replace(/^sap\s+/i, '').trim();
+        if (typeof SISTEMA_COORDINADOR_MAP !== 'undefined') {
+          if (SISTEMA_COORDINADOR_MAP[clean]) {
+            detectedCoordinators.push(SISTEMA_COORDINADOR_MAP[clean]);
+          } else {
+            for (const key of Object.keys(SISTEMA_COORDINADOR_MAP)) {
+              if (clean.includes(key) || key.includes(clean)) {
+                detectedCoordinators.push(SISTEMA_COORDINADOR_MAP[key]);
+                break;
+              }
+            }
+          }
+        }
+      });
+      detectedCoordinators = [...new Set(detectedCoordinators)];
     }
 
     let detectedSystem = detectedSystems.length > 0 ? detectedSystems[0] : (sid || 'General');
@@ -30530,20 +31260,13 @@ window.closeRfcConfirmModal = closeRfcConfirmModal;
 
 window.isDashboardTqsActive = false;
 function toggleDashboardTqs() {
-  window.isDashboardTqsActive = !window.isDashboardTqsActive;
-  const btn = document.getElementById('btn-dashboard-tqs-toggle');
-  if (btn) {
-    if (window.isDashboardTqsActive) {
-      btn.className = 'btn btn-primary btn-sm';
-      btn.innerHTML = '✓ Dashboard TQS (Activo)';
-      if (typeof showToast === 'function') showToast('Dashboard TQS activado: Mostrando tus sistemas y RFCs vinculados', 'info');
-    } else {
-      btn.className = 'btn btn-secondary btn-sm';
-      btn.innerHTML = '👤 Dashboard TQS';
-      if (typeof showToast === 'function') showToast('Dashboard general restaurado', 'info');
-    }
+  const current = (window._sidebarRfcScope === 'tqs' || window.isDashboardTqsActive) ? 'tqs' : 'general';
+  const next = current === 'tqs' ? 'general' : 'tqs';
+  if (typeof setDashboardScope === 'function') {
+    setDashboardScope(next);
+  } else if (typeof setSidebarRfcScope === 'function') {
+    setSidebarRfcScope(next === 'tqs' ? 'tqs' : 'todos');
   }
-  if (typeof renderDashboard === 'function') renderDashboard();
 }
 window.toggleDashboardTqs = toggleDashboardTqs;
 
@@ -30566,6 +31289,14 @@ function clearSolKofSelection() {
 }
 window.syncSolKofSelectFromCheckboxes = syncSolKofSelectFromCheckboxes;
 window.clearSolKofSelection = clearSolKofSelection;
+
+if (typeof initAiFabDraggable === 'function') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAiFabDraggable);
+  } else {
+    initAiFabDraggable();
+  }
+}
 
 </script>
 
